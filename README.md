@@ -68,6 +68,11 @@ son manifeste SxS embarqué correct) : c'est la résolution SxS depuis ce chemin
 $env:DEEPSEEK_API_KEY="<ta clé>"
 ```
 
+## Exemples d'objectifs
+
+[EXEMPLES.md](EXEMPLES.md) — prompts réels, dont un parcours d'inscription complet
+avec formulaire de paiement (~0,05 USD d'API), et ce qui fait un bon objectif.
+
 ## CLI
 
 ```bash
