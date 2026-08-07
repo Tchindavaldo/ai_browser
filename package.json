@@ -1,0 +1,23 @@
+{
+  "name": "rauvalia-web",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Navigateur piloté par IA (DeepSeek) — navigue, scrape et remplit des formulaires selon un objectif",
+  "bin": {
+    "rauvalia": "src/cli.js"
+  },
+  "scripts": {
+    "start": "node --env-file-if-exists=.env src/cli.js",
+    "serve": "node --env-file-if-exists=.env src/server.js",
+    "tunnel": "node --env-file-if-exists=.env src/tunnel.js",
+    "postinstall": "playwright install firefox chromium webkit"
+  },
+  "dependencies": {
+    "playwright": "^1.49.0",
+    "swagger-ui-dist": "^5.32.12"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

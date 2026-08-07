@@ -1,0 +1,790 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Rauvalia</title>
+<style>
+/* ============================================================
+   Jetons de design
+   ============================================================ */
+:root {
+  --bg:        #0a0d13;
+  --surface:   #10141c;
+  --surface-2: #151a24;
+  --surface-3: #1b2130;
+  --line:      #212837;
+  --line-soft: #1a202c;
+  --fg:        #e8ecf3;
+  --fg-soft:   #c2cad8;
+  --muted:     #8792a6;
+  --faint:     #5d6779;
+  --accent:    #6aa5ff;
+  --accent-bg: rgba(106,165,255,.13);
+  --ok:        #46c46b;
+  --ok-bg:     rgba(70,196,107,.13);
+  --warn:      #e0b341;
+  --warn-bg:   rgba(224,179,65,.13);
+  --danger:    #f0645a;
+  --danger-bg: rgba(240,100,90,.13);
+  --mono: ui-monospace, "Cascadia Code", "SF Mono", Consolas, monospace;
+  --r-sm: 7px; --r: 11px; --r-lg: 15px;
+  --shadow: 0 1px 2px rgba(0,0,0,.4), 0 8px 24px -12px rgba(0,0,0,.7);
+}
+* { box-sizing: border-box; }
+html, body { height: 100%; }
+body {
+  margin: 0; overflow: hidden;
+  background: var(--bg); color: var(--fg);
+  font: 13.5px/1.55 ui-sans-serif, system-ui, "Segoe UI", Roboto, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  display: grid; grid-template-columns: 62px 1fr;
+}
+::-webkit-scrollbar { width: 9px; height: 9px; }
+::-webkit-scrollbar-thumb { background: #232a38; border-radius: 9px; border: 2px solid transparent; background-clip: content-box; }
+::-webkit-scrollbar-thumb:hover { background: #2f3949; background-clip: content-box; }
+::-webkit-scrollbar-track { background: transparent; }
+
+/* ============================================================
+   Rail de navigation
+   ============================================================ */
+.rail {
+  display: flex; flex-direction: column; align-items: center; gap: 6px;
+  padding: 14px 0; background: var(--surface); border-right: 1px solid var(--line);
+}
+.logo {
+  width: 34px; height: 34px; border-radius: 10px; display: grid; place-items: center;
+  background: linear-gradient(145deg, #6aa5ff, #3d6fd6); color: #06101f;
+  font-weight: 800; font-size: 15px; letter-spacing: -.5px; margin-bottom: 12px;
+  box-shadow: 0 4px 14px -6px #6aa5ff;
+}
+.rail button {
+  width: 40px; height: 40px; border-radius: 10px; border: 1px solid transparent;
+  background: none; color: var(--faint); cursor: pointer; display: grid; place-items: center;
+  transition: color .12s, background .12s;
+}
+.rail button:hover { color: var(--fg-soft); background: var(--surface-2); }
+.rail button.on { color: var(--accent); background: var(--accent-bg); border-color: rgba(106,165,255,.25); }
+.rail .spacer { flex: 1; }
+.rail button.danger:hover { color: var(--danger); background: var(--danger-bg); }
+svg { display: block; }
+
+/* ============================================================
+   Cadre principal
+   ============================================================ */
+.frame { min-width: 0; min-height: 0; display: flex; flex-direction: column; overflow: hidden; }
+.topbar {
+  flex: none; height: 56px; display: flex; align-items: center; gap: 12px;
+  padding: 0 18px; border-bottom: 1px solid var(--line); background: var(--surface);
+}
+.topbar h1 { margin: 0; font-size: 15px; font-weight: 600; letter-spacing: -.1px; }
+.topbar .sub { color: var(--faint); font-size: 12.5px; }
+.topbar .grow { flex: 1; }
+
+.pill {
+  display: inline-flex; align-items: center; gap: 7px; padding: 5px 11px;
+  border-radius: 999px; font-size: 12.5px; border: 1px solid var(--line);
+  background: var(--surface-2); color: var(--muted); white-space: nowrap;
+}
+.pill.live { color: var(--warn); border-color: rgba(224,179,65,.3); background: var(--warn-bg); }
+.pill.idle { color: var(--ok); border-color: rgba(70,196,107,.25); background: var(--ok-bg); }
+.spark { width: 7px; height: 7px; border-radius: 50%; background: currentColor; }
+.pill.live .spark { animation: pulse 1.1s ease-in-out infinite; }
+@keyframes pulse { 0%,100% { opacity: 1; transform: scale(1); } 50% { opacity: .35; transform: scale(.8); } }
+
+/* ============================================================
+   Boutons & champs
+   ============================================================ */
+.btn {
+  display: inline-flex; align-items: center; gap: 6px; height: 32px; padding: 0 12px;
+  border-radius: var(--r-sm); border: 1px solid var(--line); background: var(--surface-2);
+  color: var(--fg-soft); font: inherit; font-size: 12.5px; cursor: pointer;
+  transition: border-color .12s, background .12s, color .12s; white-space: nowrap;
+}
+.btn:hover:not(:disabled) { border-color: #33405a; background: var(--surface-3); color: var(--fg); }
+.btn:disabled { opacity: .35; cursor: not-allowed; }
+.btn.primary { background: var(--accent); border-color: var(--accent); color: #05192f; font-weight: 600; }
+.btn.primary:hover:not(:disabled) { background: #7db1ff; border-color: #7db1ff; color: #05192f; }
+.btn.ghost { background: none; }
+.btn.danger { color: var(--danger); }
+.btn.danger:hover:not(:disabled) { background: var(--danger-bg); border-color: rgba(240,100,90,.4); color: var(--danger); }
+.btn.warn { color: var(--warn); }
+.btn.warn:hover:not(:disabled) { background: var(--warn-bg); border-color: rgba(224,179,65,.4); color: var(--warn); }
+.btn.icon { width: 30px; height: 30px; padding: 0; justify-content: center; }
+
+select, input[type=text], textarea {
+  background: var(--surface-2); border: 1px solid var(--line); color: var(--fg);
+  border-radius: var(--r-sm); padding: 6px 10px; font: inherit; font-size: 12.5px;
+}
+select:focus, input:focus, textarea:focus { outline: none; border-color: var(--accent); }
+.switch { display: inline-flex; align-items: center; gap: 7px; color: var(--muted); font-size: 12.5px; cursor: pointer; }
+
+/* ============================================================
+   Popover « nouvelle session »
+   ============================================================ */
+.pop-wrap { position: relative; }
+.pop {
+  position: absolute; right: 0; top: calc(100% + 8px); width: 288px; z-index: 40;
+  background: var(--surface-2); border: 1px solid var(--line); border-radius: var(--r);
+  box-shadow: var(--shadow); padding: 14px; display: none;
+}
+.pop.open { display: block; }
+.pop h3 { margin: 0 0 4px; font-size: 13px; font-weight: 600; }
+.pop p { margin: 0 0 12px; color: var(--faint); font-size: 12px; line-height: 1.5; }
+.pop .field { margin-bottom: 11px; }
+.pop label.lbl { display: block; color: var(--muted); font-size: 11px; text-transform: uppercase;
+  letter-spacing: .07em; font-weight: 600; margin-bottom: 6px; }
+.pop select { width: 100%; }
+.choice { display: grid; gap: 7px; }
+.choice button {
+  text-align: left; padding: 9px 11px; border-radius: var(--r-sm); cursor: pointer;
+  border: 1px solid var(--line); background: var(--surface); color: var(--fg); font: inherit;
+}
+.choice button:hover { border-color: #33405a; background: var(--surface-3); }
+.choice button b { display: block; font-size: 12.5px; font-weight: 600; margin-bottom: 2px; }
+.choice button span { color: var(--faint); font-size: 11.5px; line-height: 1.45; }
+.choice button:disabled { opacity: .4; cursor: not-allowed; }
+.seg { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; background: var(--surface);
+  border: 1px solid var(--line); border-radius: var(--r-sm); padding: 3px; }
+.seg button { border: 0; background: none; color: var(--muted); font: inherit; font-size: 12px;
+  padding: 5px 8px; border-radius: 5px; cursor: pointer; }
+.seg button:hover { color: var(--fg); }
+.seg button.on { background: var(--accent-bg); color: var(--accent); font-weight: 600;
+  box-shadow: inset 0 0 0 1px rgba(106,165,255,.25); }
+
+/* ============================================================
+   Vues
+   ============================================================ */
+.view { flex: 1; min-height: 0; overflow: hidden; display: none; }
+.view.on { display: block; }
+
+/* ---------- Tableau de bord ---------- */
+#dash { overflow-y: auto; padding: 20px 22px 28px; }
+.tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(168px, 1fr)); gap: 12px; margin-bottom: 20px; }
+.tile {
+  background: var(--surface); border: 1px solid var(--line); border-radius: var(--r);
+  padding: 14px 16px; position: relative; overflow: hidden;
+}
+.tile .k { color: var(--muted); font-size: 11px; text-transform: uppercase; letter-spacing: .07em; font-weight: 600; }
+.tile .v { font-size: 28px; font-weight: 650; letter-spacing: -1px; line-height: 1.25; margin-top: 4px; font-variant-numeric: tabular-nums; }
+.tile .h { color: var(--faint); font-size: 11.5px; }
+.tile.accent .v { color: var(--accent); }
+.tile.live .v { color: var(--warn); }
+
+.cols { display: grid; grid-template-columns: minmax(0,1.55fr) minmax(280px,.9fr); gap: 16px; align-items: start; }
+@media (max-width: 1080px) { .cols { grid-template-columns: 1fr; } }
+
+.sec-title {
+  display: flex; align-items: center; gap: 9px; margin: 0 0 11px;
+  color: var(--muted); font-size: 11px; text-transform: uppercase; letter-spacing: .08em; font-weight: 700;
+}
+.sec-title .count {
+  color: var(--faint); background: var(--surface-2); border: 1px solid var(--line);
+  border-radius: 999px; padding: 1px 8px; font-size: 10.5px; letter-spacing: 0;
+}
+
+.bcard {
+  background: var(--surface); border: 1px solid var(--line); border-radius: var(--r);
+  margin-bottom: 12px; overflow: hidden;
+}
+.bcard > header {
+  display: flex; align-items: center; gap: 10px; padding: 11px 14px;
+  border-bottom: 1px solid var(--line-soft); background: var(--surface-2);
+}
+.eng {
+  display: inline-flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 600;
+  padding: 3px 9px; border-radius: 999px; background: var(--surface-3); border: 1px solid var(--line);
+}
+.eng i { width: 7px; height: 7px; border-radius: 50%; background: var(--muted); }
+.eng[data-e=firefox]  i { background: #ff9d4d; } .eng[data-e=chromium] i { background: #6aa5ff; }
+.eng[data-e=edge]     i { background: #4fc3f7; } .eng[data-e=chrome]   i { background: #f2c14e; }
+.eng[data-e=webkit]   i { background: #c792ea; }
+.bcard header .meta { color: var(--faint); font-size: 11.5px; }
+.bcard header .grow { flex: 1; }
+
+.srow {
+  display: grid; grid-template-columns: 104px 1fr auto; gap: 13px; align-items: center;
+  padding: 11px 14px; cursor: pointer; border-top: 1px solid var(--line-soft);
+  transition: background .12s;
+}
+.srow:first-of-type { border-top: 0; }
+.srow:hover { background: var(--surface-2); }
+.srow.active { background: linear-gradient(90deg, var(--accent-bg), transparent 60%); box-shadow: inset 2px 0 0 var(--accent); }
+.thumb {
+  width: 104px; height: 65px; border-radius: 8px; border: 1px solid var(--line);
+  background: var(--surface-3) center/cover no-repeat; overflow: hidden;
+  display: grid; place-items: center; color: var(--faint); font-size: 10.5px;
+}
+.srow .nm { font-weight: 600; font-size: 13px; margin-bottom: 2px; display: flex; align-items: center; gap: 7px; }
+.srow .url {
+  color: var(--faint); font-size: 11.5px; font-family: var(--mono);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.srow .doing {
+  margin-top: 4px; font-size: 11.5px; color: var(--warn); display: flex; align-items: center; gap: 6px;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.srow .doing code { font-family: var(--mono); color: var(--fg-soft); }
+.srow .acts { display: flex; gap: 5px; opacity: .5; transition: opacity .12s; }
+.srow:hover .acts { opacity: 1; }
+.chip {
+  display: inline-flex; align-items: center; gap: 5px; font-size: 10.5px; font-weight: 600;
+  padding: 2px 8px; border-radius: 999px; letter-spacing: .02em;
+}
+.chip.run  { color: var(--warn); background: var(--warn-bg); }
+.chip.idle { color: var(--muted); background: var(--surface-3); }
+
+/* ---------- Flux global ---------- */
+.feed { background: var(--surface); border: 1px solid var(--line); border-radius: var(--r); overflow: hidden; }
+.feed .fi { display: grid; grid-template-columns: auto 1fr auto; gap: 10px; align-items: baseline;
+  padding: 9px 13px; border-top: 1px solid var(--line-soft); font-size: 12.5px; }
+.feed .fi:first-child { border-top: 0; }
+.feed .who { color: var(--faint); font-size: 11px; max-width: 82px; overflow: hidden;
+  text-overflow: ellipsis; white-space: nowrap; }
+.feed .what { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.feed .what b { color: var(--accent); font-family: var(--mono); font-size: 11.5px; font-weight: 600; }
+.feed .what.user { color: var(--fg-soft); }
+.feed .what.ok { color: var(--ok); } .feed .what.ko { color: var(--danger); }
+.feed .t { color: var(--faint); font-size: 10.5px; font-variant-numeric: tabular-nums; }
+
+.empty-state {
+  border: 1px dashed var(--line); border-radius: var(--r-lg); padding: 40px 28px;
+  text-align: center; color: var(--muted); background: var(--surface);
+}
+.empty-state h2 { margin: 0 0 6px; font-size: 16px; color: var(--fg); font-weight: 600; }
+.empty-state p { margin: 0 auto 18px; max-width: 380px; font-size: 13px; line-height: 1.6; color: var(--faint); }
+
+/* ---------- Espace de travail ---------- */
+#work { display: none; grid-template-rows: auto 1fr; }
+#work.on { display: grid; }
+.strip {
+  display: flex; gap: 7px; padding: 9px 14px; overflow-x: auto;
+  border-bottom: 1px solid var(--line); background: var(--surface); align-items: center;
+}
+.stab {
+  flex: none; display: flex; align-items: center; gap: 8px; cursor: pointer; max-width: 230px;
+  background: var(--surface-2); border: 1px solid var(--line); border-radius: 999px;
+  padding: 5px 6px 5px 12px; font-size: 12.5px; transition: border-color .12s, background .12s;
+}
+.stab:hover { border-color: #33405a; }
+.stab.active { border-color: rgba(106,165,255,.45); background: var(--accent-bg); color: #cfe1ff; }
+.stab .nm { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.stab .x { width: 18px; height: 18px; border-radius: 50%; display: grid; place-items: center;
+  color: var(--faint); font-size: 13px; line-height: 1; }
+.stab .x:hover { background: var(--danger-bg); color: var(--danger); }
+
+.wgrid { display: grid; grid-template-columns: minmax(330px, 33%) 1fr; min-height: 0; overflow: hidden; }
+.pane { display: flex; flex-direction: column; min-height: 0; min-width: 0; overflow: hidden; }
+.pane + .pane { border-left: 1px solid var(--line); }
+.phead {
+  flex: none; display: flex; align-items: center; gap: 9px; padding: 9px 14px;
+  border-bottom: 1px solid var(--line); background: var(--surface);
+}
+.phead .tag { color: var(--muted); font-size: 11px; text-transform: uppercase; letter-spacing: .08em; font-weight: 700; }
+.phead .u { flex: 1; min-width: 0; color: var(--faint); font-family: var(--mono); font-size: 11.5px;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+#log { flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: contain;
+  padding: 16px 14px; display: flex; flex-direction: column; gap: 11px; }
+.msg { max-width: 94%; font-size: 13px; }
+.msg.me { align-self: flex-end; background: linear-gradient(160deg,#2f74e0,#2861c4); color: #fff;
+  padding: 9px 13px; border-radius: 13px 13px 4px 13px; white-space: pre-wrap; box-shadow: var(--shadow); }
+.msg.sys { color: var(--faint); font-size: 11.5px; text-align: center; max-width: 100%; }
+.msg.done { border-left: 2px solid var(--ok); background: var(--surface); padding: 10px 13px;
+  border-radius: 0 var(--r-sm) var(--r-sm) 0; white-space: pre-wrap; max-width: 100%; }
+.msg.done.ko { border-left-color: var(--danger); }
+.msg.wait { color: var(--faint); font-size: 12px; font-style: italic; display: flex; align-items: center; gap: 8px; }
+.msg.shot { max-width: 100%; background: var(--surface); border: 1px solid var(--line);
+  border-radius: var(--r-sm); overflow: hidden; }
+.msg.shot img { display: block; width: 100%; max-height: 260px; object-fit: cover; object-position: top; }
+.msg.shot .cap { display: flex; align-items: center; gap: 10px; padding: 7px 11px;
+  border-top: 1px solid var(--line-soft); color: var(--faint); font-size: 11.5px; }
+.msg.shot .cap span { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.msg.shot .dl { color: var(--accent); text-decoration: none; font-weight: 600; }
+.msg.shot .dl:hover { text-decoration: underline; }
+
+form { flex: none; display: flex; gap: 9px; padding: 12px; border-top: 1px solid var(--line); background: var(--surface); }
+form textarea { flex: 1; resize: none; max-height: 140px; padding: 9px 12px; border-radius: var(--r-sm); }
+
+.rgrid { display: grid; grid-template-rows: 1fr 1fr; min-height: 0; }
+.rgrid > .pane + .pane { border-left: 0; border-top: 1px solid var(--line); }
+.live { flex: 1; min-height: 0; display: grid; place-items: center; padding: 14px; overflow: auto; background: #070a0f; }
+.live img { max-width: 100%; max-height: 100%; border-radius: 9px; border: 1px solid var(--line); box-shadow: var(--shadow); }
+.live .idle { color: var(--faint); font-size: 12.5px; }
+
+#brain { flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: contain; padding: 14px 16px; }
+#brain .empty { color: var(--faint); font-size: 12.5px; }
+.step { position: relative; padding: 0 0 4px 16px; margin-bottom: 15px; border-left: 2px solid var(--line); }
+.step:last-child { border-left-color: var(--accent); }
+.step .n { display: inline-block; color: var(--faint); font-family: var(--mono); font-size: 10.5px;
+  letter-spacing: .06em; margin-bottom: 4px; }
+.step .why { white-space: pre-wrap; color: var(--fg-soft); margin-bottom: 7px; font-size: 12.5px; }
+.step .call { font-family: var(--mono); font-size: 12px; background: var(--surface); border: 1px solid var(--line);
+  border-radius: var(--r-sm); padding: 7px 10px; margin-bottom: 6px; overflow-wrap: anywhere; }
+.step .call b { color: var(--accent); font-weight: 600; }
+.step .out { display: block; margin-top: 5px; padding-top: 5px; border-top: 1px solid var(--line-soft);
+  color: var(--muted); white-space: pre-wrap; }
+.step .out.ko { color: var(--danger); }
+
+@media (max-width: 900px) { .wgrid { grid-template-columns: 1fr; grid-template-rows: 1fr 1fr; }
+  .pane + .pane { border-left: 0; border-top: 1px solid var(--line); } }
+</style>
+</head>
+<body>
+
+<nav class="rail">
+  <div class="logo">R</div>
+  <button id="navDash" class="on" title="Tableau de bord">
+    <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+      <rect x="3" y="3" width="7" height="9" rx="1.5"/><rect x="14" y="3" width="7" height="5" rx="1.5"/>
+      <rect x="14" y="12" width="7" height="9" rx="1.5"/><rect x="3" y="16" width="7" height="5" rx="1.5"/></svg>
+  </button>
+  <button id="navWork" title="Espace de travail">
+    <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+      <rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 9h18M8 4v5"/></svg>
+  </button>
+  <div class="spacer"></div>
+  <a href="/docs" target="_blank" rel="noopener" title="Documentation de l'API"
+     style="width:40px;height:40px;border-radius:10px;display:grid;place-items:center;color:var(--faint);text-decoration:none">
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M4 5.5A2.5 2.5 0 0 1 6.5 3H19v15H6.5A2.5 2.5 0 0 0 4 20.5z"/><path d="M9 7.5h6M9 11h6"/></svg>
+  </a>
+  <button id="btnShutdown" class="danger" title="Couper le serveur">
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round">
+      <path d="M12 3v9"/><path d="M18.4 6.6a9 9 0 1 1-12.8 0"/></svg>
+  </button>
+</nav>
+
+<div class="frame">
+  <div class="topbar">
+    <h1 id="viewTitle">Tableau de bord</h1>
+    <span class="sub" id="viewSub"></span>
+    <span class="grow"></span>
+    <span class="pill idle" id="globalPill"><span class="spark"></span><span id="globalTxt">au repos</span></span>
+    <div class="pop-wrap">
+      <button class="btn primary" id="btnNew">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
+        Nouvelle session
+      </button>
+      <div class="pop" id="pop">
+        <h3>Nouvelle session</h3>
+        <p>Un onglet partage le profil de la session active. Un navigateur repart d'un profil invite vierge.</p>
+        <div class="field">
+          <label class="lbl" for="engine">Moteur</label>
+          <select id="engine">
+            <option value="chromium" selected>Chromium</option>
+            <option value="firefox">Firefox</option>
+            <option value="edge">Edge — installé</option>
+            <option value="chrome">Chrome — installé</option>
+            <option value="webkit">WebKit</option>
+          </select>
+        </div>
+        <div class="field">
+          <label class="lbl">Affichage</label>
+          <div class="seg">
+            <button type="button" class="on" data-headless="1">Sans fenêtre</button>
+            <button type="button" data-headless="0">Fenêtre visible</button>
+          </div>
+        </div>
+        <div class="choice">
+          <button id="mkBrowser"><b>Nouveau navigateur</b><span>Profil invite neuf, cloisonné du reste.</span></button>
+          <button id="mkTab"><b>Nouvel onglet</b><span>Dans le navigateur de la session active — mêmes connexions.</span></button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ======================= TABLEAU DE BORD ======================= -->
+  <div class="view on" id="dash">
+    <div class="tiles">
+      <div class="tile"><div class="k">Sessions</div><div class="v" id="tSessions">0</div><div class="h" id="hSessions">aucune conversation</div></div>
+      <div class="tile"><div class="k">Navigateurs</div><div class="v" id="tBrowsers">0</div><div class="h" id="hBrowsers">aucun profil ouvert</div></div>
+      <div class="tile live"><div class="k">Tâches en cours</div><div class="v" id="tRunning">0</div><div class="h" id="hRunning">rien en exécution</div></div>
+      <div class="tile accent"><div class="k">Actions exécutées</div><div class="v" id="tActions">0</div><div class="h" id="hActions">sur 0 tâche</div></div>
+    </div>
+
+    <div class="cols">
+      <div>
+        <div class="sec-title">Navigateurs &amp; onglets <span class="count" id="cBrowsers">0</span></div>
+        <div id="browsers"></div>
+      </div>
+      <div>
+        <div class="sec-title">Flux d'activité</div>
+        <div class="feed" id="feed"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ======================= ESPACE DE TRAVAIL ======================= -->
+  <div class="view" id="work">
+    <div class="strip" id="strip"></div>
+    <div class="wgrid">
+      <div class="pane">
+        <div class="phead">
+          <span class="tag">Conversation</span>
+          <span class="u" id="convTitle"></span>
+          <button class="btn icon warn" id="btnCancel" title="Couper la tâche en cours" disabled>
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="6" width="12" height="12" rx="2"/></svg>
+          </button>
+          <button class="btn icon" id="btnClear" title="Nettoyer la session" disabled>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14"/></svg>
+          </button>
+        </div>
+        <div id="log"></div>
+        <form id="form">
+          <textarea id="input" rows="2" placeholder="Décris l'objectif — l'agent navigue, scrape et remplit les formulaires lui-même"></textarea>
+          <button class="btn primary" id="send" style="height:auto;padding:0 18px">Go</button>
+        </form>
+      </div>
+
+      <div class="pane rgrid">
+        <div class="pane">
+          <div class="phead"><span class="tag">Vue live</span><span class="u" id="bar">aucune page</span></div>
+          <div class="live"><span class="idle" id="idle">Le navigateur apparaîtra ici</span><img id="shot" hidden alt=""></div>
+        </div>
+        <div class="pane">
+          <div class="phead"><span class="tag">Activité de l'agent</span><span class="u" id="stepTxt"></span></div>
+          <div id="brain"><div class="empty">Réflexions et détail des actions s'afficheront ici, étape par étape.</div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+const $ = (id) => document.getElementById(id);
+const esc = (s) => String(s ?? '').replace(/[<>&]/g, (c) => ({ '<': '&lt;', '>': '&gt;', '&': '&amp;' }[c]));
+const post = (p, b) => fetch(p, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(b ?? {}) });
+const hhmm = (ts) => new Date(ts).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+const plural = (n, s, p) => `${n} ${n > 1 ? (p ?? s + 's') : s}`;
+
+let ST = { sessions: [], browsers: [], feed: [], totals: {}, activeId: null };
+let THUMBS = {};
+let view = 'dash';
+const active = () => ST.sessions.find((s) => s.id === ST.activeId);
+
+/* ================= navigation ================= */
+function setView(v) {
+  view = v;
+  $('dash').classList.toggle('on', v === 'dash');
+  $('work').classList.toggle('on', v === 'work');
+  $('navDash').classList.toggle('on', v === 'dash');
+  $('navWork').classList.toggle('on', v === 'work');
+  $('viewTitle').textContent = v === 'dash' ? 'Tableau de bord' : 'Espace de travail';
+  const a = active();
+  $('viewSub').textContent = v === 'work' && a ? `· ${a.title} · ${a.browserLabel ?? ''}` : '';
+  if (v === 'dash') refreshThumbs();
+}
+$('navDash').onclick = () => setView('dash');
+$('navWork').onclick = () => { if (!ST.sessions.length) { openPop(true); return; } setView('work'); };
+
+/* ================= popover ================= */
+let HEADLESS = true;
+document.querySelectorAll('.seg button').forEach((b) => {
+  b.onclick = () => {
+    HEADLESS = b.dataset.headless === '1';
+    document.querySelectorAll('.seg button').forEach((x) => x.classList.toggle('on', x === b));
+  };
+});
+
+const openPop = (b) => $('pop').classList.toggle('open', b ?? !$('pop').classList.contains('open'));
+$('btnNew').onclick = (e) => { e.stopPropagation(); openPop(); };
+document.addEventListener('click', (e) => { if (!e.target.closest('.pop-wrap')) openPop(false); });
+
+/* ================= tableau de bord ================= */
+function renderDash() {
+  const t = ST.totals ?? {};
+  $('tSessions').textContent = t.sessions ?? 0;
+  $('tBrowsers').textContent = t.browsers ?? 0;
+  $('tRunning').textContent = t.running ?? 0;
+  $('tActions').textContent = t.actions ?? 0;
+  $('hSessions').textContent = t.sessions ? plural(t.sessions, 'conversation') + ' ouverte' + (t.sessions > 1 ? 's' : '') : 'aucune conversation';
+  $('hBrowsers').textContent = t.browsers ? plural(t.browsers, 'profil invite') : 'aucun profil ouvert';
+  $('hRunning').textContent = t.running ? 'agent au travail' : 'rien en exécution';
+  $('hActions').textContent = `sur ${plural(t.tasks ?? 0, 'tâche')}`;
+  $('cBrowsers').textContent = ST.browsers.length;
+
+  const box = $('browsers');
+  if (!ST.browsers.length) {
+    box.innerHTML = `<div class="empty-state">
+      <h2>Aucune session ouverte</h2>
+      <p>Lance un navigateur pour commencer. Chaque session est une conversation indépendante avec son propre onglet.</p>
+      <button class="btn primary" onclick="document.getElementById('btnNew').click()">Créer une session</button></div>`;
+  } else {
+    box.innerHTML = ST.browsers.map((h) => {
+      const rows = ST.sessions.filter((s) => s.hostId === h.id).map((s) => {
+        const th = THUMBS[s.id];
+        const doing = s.busy
+          ? `<div class="doing"><span class="spark" style="background:var(--warn)"></span>${
+              s.lastAction ? `<code>${esc(s.lastAction.name)}</code> ${esc(JSON.stringify(s.lastAction.args ?? {}).slice(0, 60))}`
+                           : 'réflexion en cours…'}</div>`
+          : s.lastResult
+            ? `<div class="doing" style="color:${s.lastResult.success ? 'var(--ok)' : 'var(--faint)'}">${esc(String(s.lastResult.result).slice(0, 90))}</div>`
+            : '';
+        return `<div class="srow ${s.id === ST.activeId ? 'active' : ''}" data-id="${s.id}">
+          <div class="thumb" ${th ? `style="background-image:url(data:image/jpeg;base64,${th})"` : ''}>${th ? '' : 'vide'}</div>
+          <div style="min-width:0">
+            <div class="nm">${esc(s.title)}
+              <span class="chip ${s.busy ? 'run' : 'idle'}">${s.busy ? 'en cours · étape ' + (s.steps || 1) : 'prête'}</span></div>
+            <div class="url">${esc(s.url && s.url !== 'about:blank' ? s.url : 'page blanche')}</div>
+            ${doing}
+          </div>
+          <div class="acts">
+            <button class="btn icon" data-act="open" title="Ouvrir">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg></button>
+            ${s.busy ? `<button class="btn icon warn" data-act="cancel" title="Couper la tâche">
+              <svg width="11" height="11" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="6" width="12" height="12" rx="2"/></svg></button>` : ''}
+            <button class="btn icon danger" data-act="close" title="Fermer la session">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
+          </div></div>`;
+      }).join('');
+
+      return `<div class="bcard"><header>
+          <span class="eng" data-e="${esc(h.engine)}"><i></i>${esc(h.engine)}</span>
+          <span style="font-weight:600">${esc(h.label)}</span>
+          <span class="meta">profil invite · ${h.headless ? 'sans fenêtre' : 'fenêtre visible'}</span>
+          <span class="grow"></span>
+          <span class="meta">${plural(h.sessions, 'onglet')}</span>
+          ${h.busy ? '<span class="chip run">actif</span>' : ''}
+        </header>${rows}</div>`;
+    }).join('');
+
+    box.querySelectorAll('.srow').forEach((row) => {
+      const id = row.dataset.id;
+      row.onclick = (e) => {
+        const act = e.target.closest('[data-act]')?.dataset.act;
+        if (act === 'cancel') return void post('/api/session/cancel?id=' + id);
+        if (act === 'close') return void closeSession(id);
+        openSession(id);
+      };
+    });
+  }
+
+  $('feed').innerHTML = (ST.feed ?? []).length
+    ? ST.feed.map((f) => {
+        let what = '';
+        if (f.type === 'action') what = `<span class="what"><b>${esc(f.name)}</b> ${esc(JSON.stringify(f.args ?? {}).slice(0, 70))}</span>`;
+        else if (f.type === 'user') what = `<span class="what user">« ${esc(String(f.text).slice(0, 70))} »</span>`;
+        else what = `<span class="what ${f.success ? 'ok' : 'ko'}">${esc(String(f.result).slice(0, 70))}</span>`;
+        return `<div class="fi"><span class="who">${esc(f.title ?? '')}</span>${what}<span class="t">${hhmm(f.ts)}</span></div>`;
+      }).join('')
+    : '<div class="fi"><span class="what" style="color:var(--faint)">Aucune activité pour l’instant.</span></div>';
+}
+
+async function refreshThumbs() {
+  if (!ST.sessions.length) return;
+  try { THUMBS = await (await fetch('/api/thumbs')).json(); if (view === 'dash') renderDash(); } catch {}
+}
+
+/* ================= espace de travail ================= */
+const say = (cls, html) => {
+  const d = document.createElement('div');
+  d.className = 'msg ' + cls; d.innerHTML = html;
+  $('log').appendChild(d); $('log').scrollTop = $('log').scrollHeight;
+  return d;
+};
+let curStep = null, curEl = null;
+function stepEl(n) {
+  if (curEl && curStep === n) return curEl;
+  $('brain').querySelector('.empty')?.remove();
+  const d = document.createElement('div');
+  d.className = 'step'; d.innerHTML = `<span class="n">ÉTAPE ${n ?? '—'}</span>`;
+  $('brain').appendChild(d); curStep = n; curEl = d;
+  return d;
+}
+/** Applique un événement aux panneaux — en direct comme au rejeu d'historique. */
+function apply(ev) {
+  const brain = $('brain');
+  if (ev.type === 'user') return void say('me', esc(ev.text));
+  if (ev.type === 'system') return void say('sys', esc(ev.text));
+  if (ev.type === 'thought') {
+    stepEl(ev.step).insertAdjacentHTML('beforeend', `<div class="why">${esc(ev.text)}</div>`);
+    $('stepTxt').textContent = `étape ${ev.step ?? ''}`;
+    brain.scrollTop = brain.scrollHeight; return;
+  }
+  if (ev.type === 'action') {
+    // Le résultat de `done` est déjà affiché dans la conversation : ici on ne
+    // garde qu'un marqueur, sinon le panneau répète tout le texte final.
+    const args = ev.name === 'done'
+      ? (ev.args?.success ? 'objectif atteint' : 'abandon')
+      : JSON.stringify(ev.args);
+    stepEl(ev.step).insertAdjacentHTML('beforeend',
+      `<div class="call"><b>${esc(ev.name)}</b> ${esc(args)}</div>`);
+    brain.scrollTop = brain.scrollHeight; return;
+  }
+  if (ev.type === 'result') {
+    const call = brain.querySelector('.step:last-child .call:last-of-type');
+    if (call) {
+      const ko = /^ERREUR/i.test(String(ev.output));
+      call.insertAdjacentHTML('beforeend', `<span class="out${ko ? ' ko' : ''}">${esc(String(ev.output).slice(0, 600))}</span>`);
+    }
+    brain.scrollTop = brain.scrollHeight; return;
+  }
+  if (ev.type === 'artifact') {
+    // Livrable produit par l'agent : affiché dans la conversation et téléchargeable.
+    say('shot',
+      `<a href="${esc(ev.url)}" target="_blank" rel="noopener"><img src="${esc(ev.url)}" alt="${esc(ev.name)}"></a>
+       <div class="cap"><span>${esc(ev.name)} · ${Math.round((ev.bytes ?? 0) / 1024)} Ko · ${ev.fullPage ? 'page entière' : 'zone visible'}</span>
+       <a class="dl" href="${esc(ev.url)}" download>Télécharger</a></div>`);
+    return;
+  }
+  if (ev.type === 'done') {
+    $('pending')?.remove();
+    say('done' + (ev.success ? '' : ' ko'), esc(ev.result));
+    $('stepTxt').textContent = ''; curStep = null; curEl = null;
+  }
+}
+
+function renderStrip() {
+  $('strip').innerHTML = ST.sessions.map((s) => `
+    <div class="stab ${s.id === ST.activeId ? 'active' : ''}" data-id="${s.id}">
+      ${s.busy ? '<span class="spark" style="background:var(--warn);animation:pulse 1.1s infinite"></span>' : ''}
+      <span class="nm">${esc(s.title)}</span><span class="x">×</span></div>`).join('')
+    || '<span style="color:var(--faint);font-size:12.5px">Aucune session — crée-en une pour commencer.</span>';
+  $('strip').querySelectorAll('.stab').forEach((t) => {
+    t.onclick = (e) => e.target.classList.contains('x') ? closeSession(t.dataset.id) : openSession(t.dataset.id);
+  });
+}
+
+function renderWork() {
+  const a = active();
+  $('convTitle').textContent = a ? a.title : '';
+  $('btnCancel').disabled = !a?.busy;
+  $('btnClear').disabled = !a || a.busy;
+  $('send').disabled = !a || a.busy;
+  $('input').disabled = !a;
+  renderStrip();
+}
+
+function render() { renderWork(); if (view === 'dash') renderDash();
+  const r = ST.totals?.running ?? 0;
+  const pill = $('globalPill');
+  pill.className = 'pill ' + (r ? 'live' : 'idle');
+  $('globalTxt').textContent = r ? plural(r, 'tâche') + ' en cours' : 'au repos';
+}
+
+/* ================= flux temps réel ================= */
+const es = new EventSource('/api/events');
+es.onmessage = (e) => {
+  const ev = JSON.parse(e.data);
+
+  if (ev.type === 'sessions') {
+    const keep = ST.activeId;
+    ST = ev;
+    ST.activeId = ST.sessions.some((s) => s.id === keep) ? keep : (ST.sessions.at(-1)?.id ?? null);
+    render(); return;
+  }
+  if (ev.type === 'state') return;
+
+  // Mise à jour locale immédiate : le tableau de bord suit l'action en cours
+  // sans attendre un rafraîchissement complet de l'état.
+  const s = ST.sessions.find((x) => x.id === ev.sessionId);
+  if (s) {
+    if (ev.type === 'user') { s.busy = true; s.objective = ev.text; s.steps = 0; s.lastAction = null; s.lastResult = null; }
+    if (ev.type === 'action') { s.busy = true; s.steps = ev.step ?? s.steps; s.lastAction = { name: ev.name, args: ev.args }; s.actions = (s.actions ?? 0) + 1; }
+    if (ev.type === 'done') { s.busy = false; s.lastAction = null; s.lastResult = { success: ev.success, result: ev.result }; }
+    if (['user', 'action', 'done'].includes(ev.type)) {
+      ST.feed = [{ ...ev, title: s.title }, ...(ST.feed ?? [])].slice(0, 40);
+      ST.totals.running = ST.sessions.filter((x) => x.busy).length;
+      ST.totals.actions = ST.sessions.reduce((n, x) => n + (x.actions ?? 0), 0);
+      render();
+    }
+  }
+
+  if (ev.sessionId && ev.sessionId !== ST.activeId) return;   // rejoué à la bascule
+  apply(ev);
+};
+es.onerror = () => { $('globalPill').className = 'pill'; $('globalTxt').textContent = 'hors ligne'; };
+
+/* ================= commandes ================= */
+async function refresh() { const keep = ST.activeId; ST = await (await fetch('/api/state')).json();
+  if (keep && ST.sessions.some((s) => s.id === keep)) ST.activeId = keep; render(); }
+
+let loadedId = null;   // session dont l'historique est actuellement affiché
+
+async function loadHistory(id) {
+  loadedId = id;
+  $('log').innerHTML = ''; curStep = null; curEl = null;
+  $('brain').innerHTML = '<div class="empty">Réflexions et détail des actions s\'afficheront ici, étape par étape.</div>';
+  $('shot').hidden = true; $('idle').hidden = false; $('bar').textContent = 'aucune page';
+  const h = await (await fetch('/api/history?id=' + id)).json();
+  for (const ev of h.events ?? []) apply(ev);
+}
+
+async function openSession(id) {
+  if (id !== ST.activeId) { await post('/api/session/select?id=' + id); ST.activeId = id; }
+  if (loadedId !== id) await loadHistory(id);
+  setView('work'); render(); $('input').focus();
+}
+
+async function newSession(mode) {
+  openPop(false);
+  const r = await post('/api/session/new', {
+    mode, engine: $('engine').value, headless: HEADLESS,
+    hostId: mode === 'tab' ? active()?.hostId : undefined
+  });
+  const body = await r.json();
+  if (!r.ok) { setView('work'); say('done ko', esc(body.error)); return; }
+  ST = body; ST.activeId = body.id;
+  await loadHistory(body.id);
+  setView('work'); render(); $('input').focus();
+}
+
+async function closeSession(id) {
+  await post('/api/session/close?id=' + id);
+  await refresh();
+  if (ST.activeId) await loadHistory(ST.activeId);
+  else { $('log').innerHTML = ''; $('brain').innerHTML = ''; setView('dash'); }
+  render();
+}
+
+$('mkTab').onclick = () => newSession('tab');
+$('mkBrowser').onclick = () => newSession('browser');
+$('btnCancel').onclick = () => post('/api/session/cancel?id=' + ST.activeId);
+$('btnClear').onclick = async () => {
+  if (!confirm('Vider l’historique de cette session et repartir sur une page blanche ?')) return;
+  await post('/api/session/clear?id=' + ST.activeId);
+  await loadHistory(ST.activeId);
+};
+$('btnShutdown').onclick = async () => {
+  if (!confirm('Couper le serveur Rauvalia ?')) return;
+  await post('/api/shutdown').catch(() => {});
+  $('globalPill').className = 'pill';
+  $('globalTxt').textContent = 'serveur arrêté';
+};
+
+$('form').onsubmit = async (e) => {
+  e.preventDefault();
+  const objective = $('input').value.trim();
+  if (!objective || active()?.busy) return;
+  $('input').value = '';
+  say('wait', '<span class="spark" style="background:var(--warn);animation:pulse 1.1s infinite"></span>L’agent travaille — détail dans « Activité de l’agent »').id = 'pending';
+  const r = await post('/api/message', { objective, id: ST.activeId });
+  const body = await r.json();
+  if (!r.ok) { $('pending')?.remove(); say('done ko', esc(body.error)); return; }
+  if (body.id !== ST.activeId) { ST.activeId = body.id; await loadHistory(body.id); }
+  await refresh();
+};
+$('input').onkeydown = (e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); $('form').requestSubmit(); } };
+
+/* ================= vues live ================= */
+setInterval(async () => {
+  if (view !== 'work' || !ST.activeId) return;
+  try {
+    const r = await (await fetch('/api/screenshot?id=' + ST.activeId)).json();
+    if (r.image) { $('shot').src = 'data:image/jpeg;base64,' + r.image; $('shot').hidden = false; $('idle').hidden = true; }
+    if (r.url) $('bar').textContent = (r.title ? r.title + '  —  ' : '') + r.url;
+  } catch {}
+}, 1200);
+setInterval(() => { if (view === 'dash') refreshThumbs(); }, 3000);
+
+// Au chargement : l'historique de la session active doit déjà être en place,
+// sinon l'espace de travail s'ouvre vide.
+refresh().then(async () => {
+  if (ST.activeId) await loadHistory(ST.activeId);
+  setView('dash');
+});
+</script>
+</body>
+</html>
