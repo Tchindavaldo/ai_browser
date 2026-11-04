@@ -15,6 +15,13 @@ L'ancienne version Python est sur la branche `legacy-python`.
 - Interface en français et simple : un accueil épuré, les détails s'ouvrent au clic.
   Les nouvelles fonctions s'intègrent à l'interface existante (rail, tuiles, vues),
   jamais dans une page à part.
+- **Ne jamais changer ce qui existe déjà sans accord.** Quand on demande de corriger,
+  on corrige le problème dans le fonctionnement existant, sans le remplacer par une autre
+  solution (exemple interdit : basculer sur Edge ou Chrome installés à la place du
+  Chromium de Playwright). Si on ne sait pas comment corriger ou si la correction modifie
+  le comportement, **demander d'abord** à l'utilisateur.
+- Faire exactement ce qui est demandé, à l'endroit demandé (exemple : une information
+  demandée « dans la liste déroulante » va dans chaque ligne de la liste, pas dans une case à cocher).
 - Ne jamais commiter de clé API : `.env` et `llm-settings.json` sont ignorés par git.
 
 ## Modèles IA

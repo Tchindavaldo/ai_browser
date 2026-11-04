@@ -903,8 +903,9 @@ $('mBtnFallback').onclick = () => saveLlm({ fallback: !LLM.fallback });
 function renderModels() {
   const f = $('mFilter').value.toLowerCase(), free = $('mFree').checked, vision = $('mVision').checked;
   const list = MODELS.filter((m) => (!free || m.free) && (!vision || m.vision) && m.id.toLowerCase().includes(f));
-  const tags = (m) => [m.free && 'gratuit', m.vision && 'images'].filter(Boolean).join(', ');
-  $('mModel').innerHTML = list.slice(0, 500).map((m) => `<option value="${esc(m.id)}">${esc(m.id)}${tags(m) ? ` (${tags(m)})` : ''}</option>`).join('');
+  // Chaque ligne de la liste déroulante indique ce que le modèle accepte en entrée.
+  const label = (m) => `[${m.vision ? 'texte + image' : 'texte seul'}]  ${m.id}${m.free ? '  -  gratuit' : ''}`;
+  $('mModel').innerHTML = list.slice(0, 500).map((m) => `<option value="${esc(m.id)}">${esc(label(m))}</option>`).join('');
   if (MODELS.length) $('mModelsMsg').textContent = `${list.length} modèle(s) affiché(s) sur ${MODELS.length}`;
 }
 async function loadModels() {
