@@ -95,6 +95,8 @@ export async function listModels(p, key) {
     if (p.id === 'gemini') {
       id = id.replace(/^models\//, '');
       if (/embedding|imagen|veo|tts|image/.test(id)) continue;
+      // Modèles Google qui ne font pas de conversation avec outils (musique, images, robotique, audio en direct...).
+      if (/^aqa$|lyria|banana|robotics|live|native-audio|deep-research|antigravity|computer-use|translate/.test(id)) continue;
     }
     if (/whisper|embed|guard|tts|transcribe|orpheus/i.test(id)) continue;
     const vision = acceptsImages(p, m, id);

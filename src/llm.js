@@ -18,6 +18,8 @@ const FILE = process.env.RAUVALIA_SETTINGS || path.join(ROOT, 'llm-settings.json
 const COOLDOWN_MS = 10 * 60 * 1000;
 // Temps maximum d'attente d'une réponse du modèle (au-delà, on passe au modèle suivant).
 const CALL_TIMEOUT_MS = 20 * 1000;
+// Pause d'un modèle qui renvoie une erreur de requête (400, 404...) : il ne marchera pas mieux tout de suite.
+const BROKEN_MS = 30 * 60 * 1000;
 const cooldown = new Map(); // "fournisseur|modèle" -> fin de pause (ms)
 
 function load() {
@@ -117,6 +119,9 @@ async function callOne(entry, { messages, tools, temperature, signal }) {
       throw new Error(`${p.name} épuisé (${res.status}) : ${text}`);
     }
     if (res.status >= 500) { lastErr = new Error(`${p.name} ${res.status} : ${text}`); continue; }
+    // Modèle inutilisable ici (n'existe pas, refuse les outils, mauvais format) : mis en pause aussi,
+    // pour ne pas le réessayer à chaque étape.
+    if ([400, 403, 404, 422].includes(res.status)) cooldown.set(`${entry.provider}|${entry.model}`, Date.now() + BROKEN_MS);
     throw new Error(`${p.name} ${res.status} : ${text}`);
   }
   throw lastErr;
@@ -150,6 +155,9 @@ let lastUsed = null;
 export function plannedModel(prefer) {
   if (prefer?.provider && prefer?.model) return prefer;
   const now = Date.now();
+  // Le modèle qui a répondu en dernier est le plus susceptible de répondre encore.
+  const ready = (e) => (cooldown.get(`${e.provider}|${e.model}`) ?? 0) <= now;
+  if (lastUsed && ready(lastUsed) && settings.chain.some((e) => e.provider === lastUsed.provider && e.model === lastUsed.model)) return lastUsed;
   return settings.chain.find((e) => (cooldown.get(`${e.provider}|${e.model}`) ?? 0) <= now) ?? settings.chain[0];
 }
 
