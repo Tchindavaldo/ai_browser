@@ -44,12 +44,24 @@ export class BrowserHost {
 
   async start() {
     const eng = ENGINES[this.engine];
-    this.browser = await eng.launcher.launch({
+    const launch = (channel) => eng.launcher.launch({
       headless: this.headless,
       args: eng.args,
-      channel: eng.channel,
-      executablePath: eng.executablePath
+      channel,
+      executablePath: channel ? undefined : eng.executablePath
     });
+    try {
+      this.browser = await launch(eng.channel);
+    } catch (e) {
+      // Sur certains Windows, le Chromium téléchargé par Playwright est bloqué par le
+      // système (spawn UNKNOWN / EACCES) en mode fenêtre visible. Edge ou Chrome installés,
+      // signés, démarrent eux : on bascule dessus automatiquement.
+      if (this.engine !== 'chromium' || !/spawn UNKNOWN|EACCES|EPERM/i.test(e.message)) throw e;
+      for (const channel of ['msedge', 'chrome']) {
+        try { this.browser = await launch(channel); this.fallbackChannel = channel; break; } catch {}
+      }
+      if (!this.browser) throw e;
+    }
     // Un contexte neuf = profil invite : aucun cookie, aucune session héritée.
     this.context = await this.browser.newContext({
       viewport: this.opts.viewport,

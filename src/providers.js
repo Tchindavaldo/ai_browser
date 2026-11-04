@@ -64,7 +64,19 @@ function isFree(p, m) {
   return false;
 }
 
-/** Liste des modèles d'un fournisseur : [{ id, free }], gratuits d'abord. */
+// Noms typiques des modèles qui acceptent des images, quand l'API ne le dit pas.
+const VISION_NAME = /vision|[-_.]vl\b|-vl-|llama-4|scout|maverick|pixtral|gemma-3|gemma-4|gpt-4o|gpt-4\.1|gpt-5|claude|gemini|llava|qwen.*omni|mistral-(small|medium)/i;
+
+function acceptsImages(p, m, id) {
+  const mods = m.architecture?.input_modalities;
+  if (Array.isArray(mods)) return mods.includes('image');
+  if (m.capabilities && 'vision' in m.capabilities) return !!m.capabilities.vision;
+  if (p.id === 'gemini') return /gemini|gemma-3|gemma-4/.test(id);
+  if (p.id === 'deepseek') return false;
+  return VISION_NAME.test(id);
+}
+
+/** Liste des modèles d'un fournisseur : [{ id, free, vision }], gratuits d'abord. */
 export async function listModels(p, key) {
   const res = await fetch(`${p.base}/models`, { headers: key ? { authorization: `Bearer ${key}` } : {} });
   if (!res.ok) throw new Error(`${res.status} ${(await res.text()).slice(0, 200)}`);
@@ -82,7 +94,7 @@ export async function listModels(p, key) {
       if (/embedding|imagen|veo|tts|image/.test(id)) continue;
     }
     if (/whisper|embed|guard|tts|transcribe/i.test(id)) continue;
-    out.push({ id, free: isFree(p, m) });
+    out.push({ id, free: isFree(p, m), vision: acceptsImages(p, m, id) });
   }
   return out.sort((a, b) => (b.free - a.free) || a.id.localeCompare(b.id));
 }

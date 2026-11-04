@@ -463,6 +463,7 @@ form textarea { flex: 1; resize: none; max-height: 140px; padding: 9px 12px; bor
         <select id="mProv"></select>
         <input id="mFilter" class="grow" placeholder="Filtrer les modèles">
         <label class="mnote" style="margin:0"><input type="checkbox" id="mFree" checked> gratuits seulement</label>
+        <label class="mnote" style="margin:0" title="Modèles capables de lire une capture d'écran de la page"><input type="checkbox" id="mVision"> acceptent les images</label>
       </div>
       <div class="mform" style="margin-top:8px">
         <select id="mModel" class="grow"></select>
@@ -900,9 +901,10 @@ $('mBtnKeys').onclick = () => togglePanel('mKeys');
 $('mBtnFallback').onclick = () => saveLlm({ fallback: !LLM.fallback });
 
 function renderModels() {
-  const f = $('mFilter').value.toLowerCase(), free = $('mFree').checked;
-  const list = MODELS.filter((m) => (!free || m.free) && m.id.toLowerCase().includes(f));
-  $('mModel').innerHTML = list.slice(0, 500).map((m) => `<option value="${esc(m.id)}">${esc(m.id)}${m.free ? ' (gratuit)' : ''}</option>`).join('');
+  const f = $('mFilter').value.toLowerCase(), free = $('mFree').checked, vision = $('mVision').checked;
+  const list = MODELS.filter((m) => (!free || m.free) && (!vision || m.vision) && m.id.toLowerCase().includes(f));
+  const tags = (m) => [m.free && 'gratuit', m.vision && 'images'].filter(Boolean).join(', ');
+  $('mModel').innerHTML = list.slice(0, 500).map((m) => `<option value="${esc(m.id)}">${esc(m.id)}${tags(m) ? ` (${tags(m)})` : ''}</option>`).join('');
   if (MODELS.length) $('mModelsMsg').textContent = `${list.length} modèle(s) affiché(s) sur ${MODELS.length}`;
 }
 async function loadModels() {
@@ -921,6 +923,7 @@ async function loadModels() {
 $('mProv').onchange = loadModels;
 $('mFilter').oninput = renderModels;
 $('mFree').onchange = renderModels;
+$('mVision').onchange = renderModels;
 $('mAddOk').onclick = async () => {
   const model = $('mCustom').value.trim() || $('mModel').value;
   if (!model) return;
