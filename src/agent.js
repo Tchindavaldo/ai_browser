@@ -97,7 +97,8 @@ export class Session {
           let args = {};
           try { args = JSON.parse(call.function.arguments || '{}'); } catch { /* arguments illisibles */ }
           const name = call.function.name;
-          const { raison, ...params } = args;
+          const { raison, etape, ...params } = args;
+          if (etape) onEvent({ type: 'title', step, text: String(etape).slice(0, 80) });
           if (raison) onEvent({ type: 'thought', step, text: raison });
           onEvent({ type: 'action', step, name, args: params });
 

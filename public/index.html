@@ -314,6 +314,7 @@ select:focus, input:focus, textarea:focus { outline: none; border-color: var(--a
 .msg.me { align-self: flex-end; background: linear-gradient(160deg,#2f74e0,#2861c4); color: #fff;
   padding: 9px 13px; border-radius: 13px 13px 4px 13px; white-space: pre-wrap; box-shadow: var(--shadow); }
 .msg.sys { color: var(--faint); font-size: 11.5px; text-align: center; max-width: 100%; }
+.dur-total { margin-top: 6px; color: var(--muted); font-size: 12px; font-variant-numeric: tabular-nums; }
 .msg.done { border-left: 2px solid var(--ok); background: var(--surface); padding: 10px 13px;
   border-radius: 0 var(--r-sm) var(--r-sm) 0; white-space: pre-wrap; max-width: 100%; }
 .msg.done.ko { border-left-color: var(--danger); }
@@ -348,6 +349,8 @@ form textarea { flex: 1; resize: none; max-height: 140px; padding: 9px 12px; bor
 .step:last-child { border-left-color: var(--accent); }
 .step .n { display: inline-block; color: var(--faint); font-family: var(--mono); font-size: 10.5px;
   letter-spacing: .06em; margin-bottom: 4px; }
+.step .n .ttl { color: var(--fg); font-family: ui-sans-serif, system-ui, sans-serif; font-size: 12.5px; font-weight: 600; margin-left: 6px; }
+.step .n .dur { color: var(--muted); margin-left: 8px; }
 .step .why { white-space: pre-wrap; color: var(--fg-soft); margin-bottom: 7px; font-size: 12.5px; }
 .step .call { font-family: var(--mono); font-size: 12px; background: var(--surface); border: 1px solid var(--line);
   border-radius: var(--r-sm); padding: 7px 10px; margin-bottom: 6px; overflow-wrap: anywhere; }
@@ -472,7 +475,11 @@ form textarea { flex: 1; resize: none; max-height: 140px; padding: 9px 12px; bor
         <label class="mnote" style="margin:0" title="Modèles capables de lire une capture d'écran de la page"><input type="checkbox" id="mVision"> acceptent les images</label>
       </div>
       <div class="mform" style="margin-top:8px">
-        <select id="mModel" class="grow"></select>
+        <select id="mModel" class="grow" multiple size="10" title="Ctrl+clic pour en choisir plusieurs"></select>
+      </div>
+      <div class="mform" style="margin-top:8px">
+        <button class="btn" id="mSelAll">Tout sélectionner (liste affichée)</button>
+        <button class="btn" id="mSelNone">Tout désélectionner</button>
         <input id="mCustom" class="grow" placeholder="ou taper le nom exact d'un modèle">
         <button class="btn primary" id="mAddOk">Ajouter</button>
       </div>
@@ -666,21 +673,38 @@ const say = (cls, html) => {
   return d;
 };
 let curStep = null, curEl = null;
-function stepEl(n) {
+let runStart = null;            // horodatage du message qui a lancé la tâche
+const fmtDur = (ms) => {
+  const s = Math.max(0, Math.round(ms / 1000));
+  return s < 60 ? `${(ms / 1000).toFixed(1).replace('.', ',')} s` : `${Math.floor(s / 60)} min ${String(s % 60).padStart(2, '0')} s`;
+};
+/** Clôt l'étape affichée : sa durée = jusqu'au début de l'étape suivante (ou la fin). */
+function closeStep(ts) {
+  if (!curEl || !curEl.dataset.start || !ts) return;
+  curEl.querySelector('.dur').textContent = fmtDur(ts - Number(curEl.dataset.start));
+}
+function stepEl(n, ts) {
   if (curEl && curStep === n) return curEl;
+  closeStep(ts);
   $('brain').querySelector('.empty')?.remove();
   const d = document.createElement('div');
-  d.className = 'step'; d.innerHTML = `<span class="n">ÉTAPE ${n ?? '—'}</span>`;
+  d.className = 'step';
+  d.innerHTML = `<span class="n">ÉTAPE ${n ?? '—'}<span class="ttl"></span><span class="dur"></span></span>`;
+  if (ts) d.dataset.start = ts;
   $('brain').appendChild(d); curStep = n; curEl = d;
   return d;
 }
 /** Applique un événement aux panneaux — en direct comme au rejeu d'historique. */
 function apply(ev) {
   const brain = $('brain');
-  if (ev.type === 'user') return void say('me', esc(ev.text));
+  if (ev.type === 'user') { runStart = ev.ts ?? Date.now(); return void say('me', esc(ev.text)); }
+  if (ev.type === 'title') {
+    stepEl(ev.step, ev.ts).querySelector('.ttl').textContent = ev.text;
+    return;
+  }
   if (ev.type === 'system') return void say('sys', esc(ev.text));
   if (ev.type === 'thought') {
-    stepEl(ev.step).insertAdjacentHTML('beforeend', `<div class="why">${esc(ev.text)}</div>`);
+    stepEl(ev.step, ev.ts).insertAdjacentHTML('beforeend', `<div class="why">${esc(ev.text)}</div>`);
     $('stepTxt').textContent = `étape ${ev.step ?? ''}`;
     brain.scrollTop = brain.scrollHeight; return;
   }
@@ -690,7 +714,7 @@ function apply(ev) {
     const args = ev.name === 'done'
       ? (ev.args?.success ? 'objectif atteint' : 'abandon')
       : JSON.stringify(ev.args);
-    stepEl(ev.step).insertAdjacentHTML('beforeend',
+    stepEl(ev.step, ev.ts).insertAdjacentHTML('beforeend',
       `<div class="call"><b>${esc(ev.name)}</b> ${esc(args)}</div>`);
     brain.scrollTop = brain.scrollHeight; return;
   }
@@ -712,8 +736,10 @@ function apply(ev) {
   }
   if (ev.type === 'done') {
     $('pending')?.remove();
-    say('done' + (ev.success ? '' : ' ko'), esc(ev.result));
-    $('stepTxt').textContent = ''; curStep = null; curEl = null;
+    closeStep(ev.ts);
+    const total = runStart && ev.ts ? `<div class="dur-total">Durée totale : ${fmtDur(ev.ts - runStart)}${ev.steps ? ` · ${ev.steps} étape${ev.steps > 1 ? 's' : ''}` : ''}</div>` : '';
+    say('done' + (ev.success ? '' : ' ko'), esc(ev.result) + total);
+    $('stepTxt').textContent = ''; curStep = null; curEl = null; runStart = null;
   }
 }
 
@@ -859,6 +885,10 @@ setInterval(async () => {
   } catch {}
 }, 1200);
 setInterval(() => { if (view === 'dash') refreshThumbs(); }, 3000);
+// Chrono en direct pendant qu'une tâche tourne.
+setInterval(() => {
+  if (runStart && active()?.busy) $('stepTxt').textContent = `étape ${curStep ?? ''} · ${fmtDur(Date.now() - runStart)}`;
+}, 1000);
 
 /* ================= modèles IA ================= */
 // Chaque ligne de liste déroulante indique ce que le modèle accepte en entrée.
@@ -965,6 +995,7 @@ function renderModels() {
   const list = MODELS.filter((m) => (!free || m.free) && (!vision || m.vision) && m.id.toLowerCase().includes(f));
   $('mModel').innerHTML = list.slice(0, 500).map((m) => `<option value="${esc(m.id)}">${esc(modelLabel(m))}</option>`).join('');
   if (MODELS.length) $('mModelsMsg').textContent = `${list.length} modèle(s) affiché(s) sur ${MODELS.length}`;
+  updateSelCount();
 }
 async function loadModels() {
   const p = LLM.providers.find((x) => x.id === $('mProv').value);
@@ -983,10 +1014,25 @@ $('mProv').onchange = loadModels;
 $('mFilter').oninput = renderModels;
 $('mFree').onchange = renderModels;
 $('mVision').onchange = renderModels;
+// Sélection multiple : clic simple, Ctrl+clic pour en choisir plusieurs, ou tout sélectionner.
+$('mSelAll').onclick = () => { [...$('mModel').options].forEach((o) => { o.selected = true; }); updateSelCount(); };
+$('mSelNone').onclick = () => { [...$('mModel').options].forEach((o) => { o.selected = false; }); updateSelCount(); };
+function updateSelCount() {
+  const n = $('mModel').selectedOptions.length;
+  $('mAddOk').textContent = n > 1 ? `Ajouter les ${n} modèles` : 'Ajouter';
+}
+$('mModel').onchange = updateSelCount;
 $('mAddOk').onclick = async () => {
-  const model = $('mCustom').value.trim() || $('mModel').value;
-  if (!model) return;
-  if (await saveLlm({ chain: [...LLM.chain, { provider: $('mProv').value, model }] })) $('mCustom').value = '';
+  const pid = $('mProv').value;
+  const typed = $('mCustom').value.trim();
+  const picked = typed ? [typed] : [...$('mModel').selectedOptions].map((o) => o.value);
+  // Pas de doublon avec ce qui est déjà dans la liste.
+  const fresh = picked.filter((m) => !LLM.chain.some((e) => e.provider === pid && e.model === m));
+  if (!fresh.length) return;
+  if (await saveLlm({ chain: [...LLM.chain, ...fresh.map((model) => ({ provider: pid, model }))] })) {
+    $('mCustom').value = '';
+    $('mModelsMsg').textContent = `${fresh.length} modèle(s) ajouté(s).`;
+  }
 };
 $('mKeysSave').onclick = async () => {
   const keys = {};

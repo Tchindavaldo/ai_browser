@@ -17,7 +17,7 @@ export const PROVIDERS = [
   },
   {
     id: 'groq', name: 'Groq', base: 'https://api.groq.com/openai/v1',
-    env: 'GROQ_API_KEY', defaultModel: 'llama-3.3-70b-versatile',
+    env: 'GROQ_API_KEY', defaultModel: 'openai/gpt-oss-120b',
     keyUrl: 'https://console.groq.com/keys', allFree: true,
     free: 'Tous les modèles gratuits avec limites par minute et par jour (Llama, Qwen, GPT-OSS, Kimi). Très rapide.'
   },
@@ -93,7 +93,7 @@ export async function listModels(p, key) {
       id = id.replace(/^models\//, '');
       if (/embedding|imagen|veo|tts|image/.test(id)) continue;
     }
-    if (/whisper|embed|guard|tts|transcribe/i.test(id)) continue;
+    if (/whisper|embed|guard|tts|transcribe|orpheus/i.test(id)) continue;
     out.push({ id, free: isFree(p, m), vision: acceptsImages(p, m, id) });
   }
   return out.sort((a, b) => (b.free - a.free) || a.id.localeCompare(b.id));

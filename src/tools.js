@@ -16,9 +16,10 @@ const t = (name, description, properties, required = []) => ({
       type: 'object',
       properties: {
         raison: { type: 'string', description: 'En une phrase : pourquoi cette action maintenant.' },
+        etape: { type: 'string', description: "Titre court (2 à 6 mots) de l'étape du parcours où tu te trouves, d'après la page actuelle. Ex. : Choix de l'offre, Création du compte, Paiement par carte." },
         ...properties
       },
-      required: ['raison', ...required]
+      required: ['raison', 'etape', ...required]
     }
   }
 });
