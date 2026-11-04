@@ -2,3 +2,4 @@ node_modules/
 captures/
 .env
 *.log
+llm-settings.json

@@ -160,6 +160,30 @@ select:focus, input:focus, textarea:focus { outline: none; border-color: var(--a
 
 /* ---------- Tableau de bord ---------- */
 #dash { overflow-y: auto; padding: 20px 22px 28px; }
+#models { overflow-y: auto; padding: 20px 22px 28px; }
+.tile.click { cursor: pointer; } .tile.click:hover { border-color: #33405a; }
+.tile .v.small { font-size: 16px; letter-spacing: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.mcard { background: var(--surface); border: 1px solid var(--line); border-radius: var(--r); padding: 14px 16px; margin-bottom: 14px; }
+.mrow { display: flex; gap: 8px; align-items: center; padding: 9px 0; border-top: 1px solid var(--line-soft); flex-wrap: wrap; }
+.mrow:first-child { border-top: 0; }
+.mrow .name { flex: 1 1 200px; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.mrow .rank { color: var(--faint); font-variant-numeric: tabular-nums; width: 18px; }
+.badge { font-size: 11px; padding: 1px 8px; border-radius: 99px; background: var(--accent-bg); color: var(--accent); }
+.badge.ko { background: var(--danger-bg); color: var(--danger); }
+.mact { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 14px; }
+.mpanel[hidden] { display: none; }
+.mform { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+.mform select, .mform input:not([type=checkbox]) { background: var(--surface-2); color: var(--fg); border: 1px solid var(--line);
+  border-radius: var(--r-sm); padding: 7px 9px; font: inherit; min-width: 0; }
+.mform .grow { flex: 1 1 240px; }
+.mnote { color: var(--muted); font-size: 12px; margin: 8px 0 0; }
+.ktable { width: 100%; border-collapse: collapse; }
+.ktable td { padding: 9px 6px; border-top: 1px solid var(--line-soft); vertical-align: top; }
+.ktable tr:first-child td { border-top: 0; }
+.ktable input { width: 100%; background: var(--surface-2); color: var(--fg); border: 1px solid var(--line);
+  border-radius: var(--r-sm); padding: 7px 9px; font: inherit; }
+.ktable a { color: var(--accent); font-size: 12px; }
+.tres { font-family: var(--mono); font-size: 12px; white-space: pre-wrap; color: var(--fg-soft); margin: 0; }
 .tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(168px, 1fr)); gap: 12px; margin-bottom: 20px; }
 .tile {
   background: var(--surface); border: 1px solid var(--line); border-radius: var(--r);
@@ -343,6 +367,10 @@ form textarea { flex: 1; resize: none; max-height: 140px; padding: 9px 12px; bor
     <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
       <rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 9h18M8 4v5"/></svg>
   </button>
+  <button id="navModels" title="Modèles IA">
+    <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+      <rect x="6" y="6" width="12" height="12" rx="2"/><path d="M9 2v4M15 2v4M9 18v4M15 18v4M2 9h4M2 15h4M18 9h4M18 15h4"/></svg>
+  </button>
   <div class="spacer"></div>
   <a href="/docs" target="_blank" rel="noopener" title="Documentation de l'API"
      style="width:40px;height:40px;border-radius:10px;display:grid;place-items:center;color:var(--faint);text-decoration:none">
@@ -400,6 +428,7 @@ form textarea { flex: 1; resize: none; max-height: 140px; padding: 9px 12px; bor
       <div class="tile"><div class="k">Sessions</div><div class="v" id="tSessions">0</div><div class="h" id="hSessions">aucune conversation</div></div>
       <div class="tile"><div class="k">Navigateurs</div><div class="v" id="tBrowsers">0</div><div class="h" id="hBrowsers">aucun profil ouvert</div></div>
       <div class="tile live"><div class="k">Tâches en cours</div><div class="v" id="tRunning">0</div><div class="h" id="hRunning">rien en exécution</div></div>
+      <div class="tile click" id="tileModel" title="Choisir les modèles IA"><div class="k">Modèle IA</div><div class="v small" id="tModel">...</div><div class="h" id="hModel">cliquer pour changer</div></div>
       <div class="tile accent"><div class="k">Actions exécutées</div><div class="v" id="tActions">0</div><div class="h" id="hActions">sur 0 tâche</div></div>
     </div>
 
@@ -413,6 +442,43 @@ form textarea { flex: 1; resize: none; max-height: 140px; padding: 9px 12px; bor
         <div class="feed" id="feed"></div>
       </div>
     </div>
+  </div>
+
+  <!-- ======================= MODELES IA ======================= -->
+  <div class="view" id="models">
+    <div class="sec-title">Modèles utilisés par l'agent</div>
+    <div class="mcard">
+      <div id="mChain"></div>
+      <p class="mnote">Le premier est utilisé. S'il est épuisé (quota, limite) ou en panne, l'agent passe au suivant.</p>
+    </div>
+    <div class="mact">
+      <button class="btn primary" id="mBtnAdd">Ajouter un modèle</button>
+      <button class="btn" id="mBtnKeys">Clés API</button>
+      <button class="btn" id="mBtnTest">Tester</button>
+      <button class="btn" id="mBtnFallback"></button>
+    </div>
+
+    <div class="mcard mpanel" id="mAdd" hidden>
+      <div class="mform">
+        <select id="mProv"></select>
+        <input id="mFilter" class="grow" placeholder="Filtrer les modèles">
+        <label class="mnote" style="margin:0"><input type="checkbox" id="mFree" checked> gratuits seulement</label>
+      </div>
+      <div class="mform" style="margin-top:8px">
+        <select id="mModel" class="grow"></select>
+        <input id="mCustom" class="grow" placeholder="ou taper le nom exact d'un modèle">
+        <button class="btn primary" id="mAddOk">Ajouter</button>
+      </div>
+      <p class="mnote" id="mModelsMsg"></p>
+    </div>
+
+    <div class="mcard mpanel" id="mKeys" hidden>
+      <p class="mnote" style="margin:0 0 8px">Gardées sur cet ordinateur uniquement (fichier llm-settings.json, jamais envoyé sur GitHub). Laisser vide pour ne pas changer.</p>
+      <table class="ktable"><tbody id="mKeyRows"></tbody></table>
+      <div class="mform" style="margin-top:10px"><button class="btn primary" id="mKeysSave">Enregistrer les clés</button><span class="mnote" id="mKeysMsg" style="margin:0"></span></div>
+    </div>
+
+    <div class="mcard mpanel" id="mTest" hidden><pre class="tres" id="mTestOut"></pre></div>
   </div>
 
   <!-- ======================= ESPACE DE TRAVAIL ======================= -->
@@ -467,16 +533,19 @@ const active = () => ST.sessions.find((s) => s.id === ST.activeId);
 /* ================= navigation ================= */
 function setView(v) {
   view = v;
-  $('dash').classList.toggle('on', v === 'dash');
-  $('work').classList.toggle('on', v === 'work');
-  $('navDash').classList.toggle('on', v === 'dash');
-  $('navWork').classList.toggle('on', v === 'work');
-  $('viewTitle').textContent = v === 'dash' ? 'Tableau de bord' : 'Espace de travail';
+  for (const [id, nav] of [['dash', 'navDash'], ['work', 'navWork'], ['models', 'navModels']]) {
+    $(id).classList.toggle('on', v === id);
+    $(nav).classList.toggle('on', v === id);
+  }
+  $('viewTitle').textContent = { dash: 'Tableau de bord', work: 'Espace de travail', models: 'Modèles IA' }[v];
+  if (v === 'models') loadLlm();
   const a = active();
   $('viewSub').textContent = v === 'work' && a ? `· ${a.title} · ${a.browserLabel ?? ''}` : '';
   if (v === 'dash') refreshThumbs();
 }
 $('navDash').onclick = () => setView('dash');
+$('navModels').onclick = () => setView('models');
+$('tileModel').onclick = () => setView('models');
 $('navWork').onclick = () => { if (!ST.sessions.length) { openPop(true); return; } setView('work'); };
 
 /* ================= popover ================= */
@@ -779,11 +848,104 @@ setInterval(async () => {
 }, 1200);
 setInterval(() => { if (view === 'dash') refreshThumbs(); }, 3000);
 
+/* ================= modèles IA ================= */
+let LLM = { chain: [], providers: [], cooldowns: {}, fallback: true };
+let MODELS = [];
+const pname = (id) => LLM.providers.find((p) => p.id === id)?.name ?? id;
+
+async function loadLlm() {
+  LLM = await (await fetch('/api/llm')).json();
+  renderLlm();
+}
+async function saveLlm(patch) {
+  const r = await post('/api/llm', patch);
+  const body = await r.json();
+  if (!r.ok) { alert(body.error); return false; }
+  LLM = body; renderLlm(); return true;
+}
+function renderLlm() {
+  const c = LLM.chain[0];
+  $('tModel').textContent = c ? `${pname(c.provider)} · ${c.model}` : 'aucun';
+  $('hModel').textContent = LLM.chain.length > 1 ? `${LLM.chain.length - 1} modèle(s) de secours` : 'aucun modèle de secours';
+  $('mChain').innerHTML = LLM.chain.map((e, i) => {
+    const cd = LLM.cooldowns[`${e.provider}|${e.model}`];
+    return `<div class="mrow"><span class="rank">${i + 1}</span>
+      <span class="name"><b>${esc(pname(e.provider))}</b> · ${esc(e.model)}</span>
+      ${i === 0 ? '<span class="badge">principal</span>' : ''}
+      ${cd ? `<span class="badge ko">épuisé, reprise dans ${cd} min</span>` : ''}
+      <button class="btn" data-mv="${i}" data-d="-1" ${i === 0 ? 'disabled' : ''}>Monter</button>
+      <button class="btn" data-mv="${i}" data-d="1" ${i === LLM.chain.length - 1 ? 'disabled' : ''}>Descendre</button>
+      <button class="btn danger" data-rm="${i}" ${LLM.chain.length === 1 ? 'disabled' : ''}>Retirer</button></div>`;
+  }).join('');
+  $('mBtnFallback').textContent = LLM.fallback ? 'Bascule automatique : activée' : 'Bascule automatique : désactivée';
+  const sorted = [...LLM.providers].sort((a, b) => b.hasKey - a.hasKey);
+  const cur = $('mProv').value;
+  $('mProv').innerHTML = sorted.map((p) => `<option value="${p.id}">${esc(p.name)}${p.hasKey ? '' : ' (pas de clé)'}</option>`).join('');
+  if (cur) $('mProv').value = cur;
+  $('mKeyRows').innerHTML = LLM.providers.map((p) => `<tr>
+    <td style="width:22%"><b>${esc(p.name)}</b><br><a href="${p.keyUrl}" target="_blank" rel="noopener">obtenir une clé</a></td>
+    <td class="mnote">${esc(p.free)}</td>
+    <td style="width:34%"><input type="password" data-key="${p.id}" placeholder="${p.hasKey ? 'enregistrée ' + esc(p.keyHint) : esc(p.env)}"></td></tr>`).join('');
+}
+$('mChain').onclick = (e) => {
+  const b = e.target.closest('button'); if (!b) return;
+  const chain = [...LLM.chain];
+  if (b.dataset.rm !== undefined) chain.splice(+b.dataset.rm, 1);
+  else { const i = +b.dataset.mv, j = i + +b.dataset.d; [chain[i], chain[j]] = [chain[j], chain[i]]; }
+  saveLlm({ chain });
+};
+const togglePanel = (id) => ['mAdd', 'mKeys', 'mTest'].forEach((x) => { $(x).hidden = x === id ? !$(x).hidden : true; });
+$('mBtnAdd').onclick = () => { togglePanel('mAdd'); if (!$('mAdd').hidden) loadModels(); };
+$('mBtnKeys').onclick = () => togglePanel('mKeys');
+$('mBtnFallback').onclick = () => saveLlm({ fallback: !LLM.fallback });
+
+function renderModels() {
+  const f = $('mFilter').value.toLowerCase(), free = $('mFree').checked;
+  const list = MODELS.filter((m) => (!free || m.free) && m.id.toLowerCase().includes(f));
+  $('mModel').innerHTML = list.slice(0, 500).map((m) => `<option value="${esc(m.id)}">${esc(m.id)}${m.free ? ' (gratuit)' : ''}</option>`).join('');
+  if (MODELS.length) $('mModelsMsg').textContent = `${list.length} modèle(s) affiché(s) sur ${MODELS.length}`;
+}
+async function loadModels() {
+  const p = LLM.providers.find((x) => x.id === $('mProv').value);
+  MODELS = []; $('mModel').innerHTML = ''; $('mModelsMsg').textContent = 'Chargement des modèles...';
+  const r = await fetch('/api/llm/models?provider=' + p.id);
+  const body = await r.json();
+  if ($('mProv').value !== p.id) return; // un autre fournisseur a été choisi entre-temps
+  if (!r.ok) {
+    $('mModelsMsg').textContent = (p.hasKey ? '' : "Ajoutez d'abord une clé pour ce fournisseur. ")
+      + `${body.error}. Vous pouvez aussi taper le nom du modèle, par exemple ${p.defaultModel}.`;
+    return;
+  }
+  MODELS = body; renderModels();
+}
+$('mProv').onchange = loadModels;
+$('mFilter').oninput = renderModels;
+$('mFree').onchange = renderModels;
+$('mAddOk').onclick = async () => {
+  const model = $('mCustom').value.trim() || $('mModel').value;
+  if (!model) return;
+  if (await saveLlm({ chain: [...LLM.chain, { provider: $('mProv').value, model }] })) $('mCustom').value = '';
+};
+$('mKeysSave').onclick = async () => {
+  const keys = {};
+  document.querySelectorAll('[data-key]').forEach((i) => { if (i.value.trim()) keys[i.dataset.key] = i.value.trim(); });
+  if (await saveLlm({ keys })) $('mKeysMsg').textContent = 'Clés enregistrées.';
+};
+$('mBtnTest').onclick = async () => {
+  togglePanel('mTest'); $('mTest').hidden = false;
+  $('mTestOut').textContent = 'Test de chaque modèle en cours...';
+  const res = await (await post('/api/llm/test')).json();
+  $('mTestOut').textContent = res.map((r, i) =>
+    `${i + 1}. ${pname(r.provider)} · ${r.model}\n   ${r.ok ? 'OK : ' + r.text : 'Échec : ' + r.error}`).join('\n\n');
+  loadLlm();
+};
+
 // Au chargement : l'historique de la session active doit déjà être en place,
 // sinon l'espace de travail s'ouvre vide.
 refresh().then(async () => {
   if (ST.activeId) await loadHistory(ST.activeId);
   setView('dash');
+  loadLlm();
 });
 </script>
 </body>

@@ -1,34 +1,148 @@
-const BASE = process.env.DEEPSEEK_BASE_URL || 'https://api.deepseek.com';
-const MODEL = process.env.DEEPSEEK_MODEL || 'deepseek-chat';
+import fs from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { PROVIDERS, provider } from './providers.js';
 
-/** Appel chat/completions compatible OpenAI, avec retry sur erreur transitoire. */
-export async function chat({ messages, tools, temperature = 0, signal }) {
-  const key = process.env.DEEPSEEK_API_KEY;
-  if (!key) throw new Error('DEEPSEEK_API_KEY manquant dans l’environnement.');
+/**
+ * Appels IA avec une chaîne de modèles et bascule automatique.
+ *
+ * Réglages (chaîne, clés, bascule) dans llm-settings.json, ignoré par git,
+ * modifiables depuis l'interface. Les clés peuvent aussi venir des variables
+ * d'environnement (DEEPSEEK_API_KEY, OPENROUTER_API_KEY, GROQ_API_KEY...).
+ */
+const ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
+const FILE = path.join(ROOT, 'llm-settings.json');
+
+// Un modèle en quota épuisé ou limité est sauté pendant ce délai.
+const COOLDOWN_MS = 10 * 60 * 1000;
+const cooldown = new Map(); // "fournisseur|modèle" -> fin de pause (ms)
+
+function load() {
+  let s = {};
+  try { s = JSON.parse(fs.readFileSync(FILE, 'utf8')); } catch {}
+  const chain = Array.isArray(s.chain) && s.chain.length
+    ? s.chain
+    : [{ provider: 'deepseek', model: provider('deepseek').defaultModel }];
+  return { chain, keys: s.keys ?? {}, fallback: s.fallback ?? true };
+}
+
+let settings = load();
+
+const save = () => fs.writeFileSync(FILE, JSON.stringify(settings, null, 2));
+
+export const keyFor = (id) => settings.keys[id] || process.env[provider(id)?.env] || '';
+
+const mask = (k) => (k.length > 10 ? `${k.slice(0, 4)}...${k.slice(-4)}` : k ? '***' : '');
+
+/** État lisible par l'interface (sans exposer les clés). */
+export function llmState() {
+  const now = Date.now();
+  return {
+    chain: settings.chain,
+    fallback: settings.fallback,
+    cooldowns: Object.fromEntries([...cooldown].filter(([, t]) => t > now).map(([k, t]) => [k, Math.ceil((t - now) / 60000)])),
+    providers: PROVIDERS.map((p) => ({
+      id: p.id, name: p.name, free: p.free, keyUrl: p.keyUrl, env: p.env,
+      defaultModel: p.defaultModel, hasKey: !!keyFor(p.id), keyHint: mask(keyFor(p.id))
+    }))
+  };
+}
+
+export function updateSettings({ chain, fallback, keys }) {
+  if (chain !== undefined) {
+    if (!Array.isArray(chain) || !chain.length) throw new Error('Il faut au moins un modèle.');
+    for (const e of chain) {
+      if (!provider(e?.provider) || !String(e?.model ?? '').trim()) throw new Error('Modèle invalide.');
+    }
+    settings.chain = chain.map((e) => ({ provider: e.provider, model: String(e.model).trim() }));
+    cooldown.clear();
+  }
+  if (fallback !== undefined) settings.fallback = !!fallback;
+  for (const [id, k] of Object.entries(keys ?? {})) {
+    if (!provider(id)) continue;
+    if (String(k).trim()) settings.keys[id] = String(k).trim();
+    else delete settings.keys[id];
+  }
+  save();
+  return llmState();
+}
+
+/** Un appel sur un seul modèle, avec relance sur erreur passagère (pas sur quota). */
+async function callOne(entry, { messages, tools, temperature, signal }) {
+  const p = provider(entry.provider);
+  if (!p) throw Object.assign(new Error(`Fournisseur inconnu : ${entry.provider}`), { skip: true });
+  const key = keyFor(p.id);
+  if (!key) throw Object.assign(new Error(`Clé manquante (${p.env})`), { skip: true });
+
+  const headers = { 'content-type': 'application/json', authorization: `Bearer ${key}` };
+  if (p.id === 'openrouter') headers['x-title'] = 'AI Browser';
+  const body = { model: entry.model, messages, temperature };
+  if (tools?.length) Object.assign(body, { tools, tool_choice: 'auto' });
 
   let lastErr;
-  for (let attempt = 0; attempt < 4; attempt++) {
+  for (let attempt = 0; attempt < 3; attempt++) {
     if (attempt) await new Promise((r) => setTimeout(r, 1000 * 2 ** attempt));
+    let res;
     try {
-      const res = await fetch(`${BASE}/chat/completions`, {
-        method: 'POST',
-        signal,
-        headers: { 'content-type': 'application/json', authorization: `Bearer ${key}` },
-        body: JSON.stringify({ model: MODEL, messages, tools, tool_choice: 'auto', temperature })
-      });
-      if (!res.ok) {
-        const body = await res.text();
-        if (res.status >= 500 || res.status === 429) { lastErr = new Error(`${res.status}: ${body.slice(0, 300)}`); continue; }
-        throw new Error(`DeepSeek ${res.status}: ${body.slice(0, 500)}`);
-      }
-      const json = await res.json();
-      return json.choices[0].message;
+      res = await fetch(`${p.base}/chat/completions`, { method: 'POST', signal, headers, body: JSON.stringify(body) });
     } catch (e) {
       if (e.name === 'AbortError') throw e;
-      lastErr = e;
+      lastErr = e; continue;
     }
+    if (res.ok) {
+      const json = await res.json();
+      const msg = json.choices?.[0]?.message;
+      if (!msg) throw new Error(`Réponse vide : ${JSON.stringify(json).slice(0, 200)}`);
+      return msg;
+    }
+    const text = (await res.text()).slice(0, 400);
+    // Quota épuisé ou limite atteinte : inutile d'insister, on passe au suivant.
+    if (res.status === 402 || res.status === 429 || /quota|rate.?limit|credit/i.test(text)) {
+      cooldown.set(`${entry.provider}|${entry.model}`, Date.now() + COOLDOWN_MS);
+      throw new Error(`${p.name} épuisé (${res.status}) : ${text}`);
+    }
+    if (res.status >= 500) { lastErr = new Error(`${p.name} ${res.status} : ${text}`); continue; }
+    throw new Error(`${p.name} ${res.status} : ${text}`);
   }
   throw lastErr;
 }
 
-export const modelName = () => MODEL;
+let lastUsed = null;
+
+/** Appel chat/completions compatible OpenAI, en suivant la chaîne de modèles. */
+export async function chat({ messages, tools, temperature = 0, signal }) {
+  const chain = settings.fallback ? settings.chain : settings.chain.slice(0, 1);
+  const now = Date.now();
+  const ready = chain.filter((e) => (cooldown.get(`${e.provider}|${e.model}`) ?? 0) <= now);
+  const errors = [];
+  for (const entry of ready.length ? ready : chain) {
+    try {
+      const msg = await callOne(entry, { messages, tools, temperature, signal });
+      lastUsed = entry;
+      return msg;
+    } catch (e) {
+      if (e.name === 'AbortError') throw e;
+      errors.push(`${entry.provider}/${entry.model} : ${e.message}`);
+    }
+  }
+  throw new Error(`Aucun modèle n'a répondu.\n${errors.join('\n')}`);
+}
+
+/** Test rapide depuis l'interface : quel modèle répond, et pourquoi les autres échouent. */
+export async function testChain() {
+  const results = [];
+  for (const entry of settings.chain) {
+    try {
+      const msg = await callOne(entry, { messages: [{ role: 'user', content: 'Réponds juste : OK' }], temperature: 0 });
+      results.push({ ...entry, ok: true, text: String(msg.content ?? '').slice(0, 80) });
+    } catch (e) {
+      results.push({ ...entry, ok: false, error: e.message.slice(0, 300) });
+    }
+  }
+  return results;
+}
+
+export const modelName = () => {
+  const e = lastUsed ?? settings.chain[0];
+  return e ? `${provider(e.provider)?.name ?? e.provider} · ${e.model}` : 'aucun';
+};

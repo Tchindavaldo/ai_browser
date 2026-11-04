@@ -4,7 +4,8 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { Manager } from './manager.js';
 import { CAPTURES } from './browser.js';
-import { modelName } from './llm.js';
+import { modelName, llmState, updateSettings, testChain, keyFor } from './llm.js';
+import { provider, listModels } from './providers.js';
 import { spec } from './openapi.js';
 
 const PORT = Number(process.env.RAUVALIA_PORT || 7331);
@@ -226,6 +227,20 @@ const server = http.createServer(async (req, res) => {
       } catch { return json(res, 200, { image: null, url: null }); }
     }
 
+    // --- Modèles IA ---
+    if (url.pathname === '/api/llm' && req.method === 'GET') return json(res, 200, llmState());
+    if (url.pathname === '/api/llm' && req.method === 'POST') {
+      try { return json(res, 200, updateSettings(await readBody(req))); }
+      catch (e) { return json(res, 400, { error: e.message }); }
+    }
+    if (url.pathname === '/api/llm/models') {
+      const p = provider(url.searchParams.get('provider'));
+      if (!p) return json(res, 404, { error: 'fournisseur inconnu' });
+      try { return json(res, 200, await listModels(p, keyFor(p.id))); }
+      catch (e) { return json(res, 502, { error: `Liste indisponible : ${e.message}` }); }
+    }
+    if (url.pathname === '/api/llm/test' && req.method === 'POST') return json(res, 200, await testChain());
+
     if (url.pathname === '/api/health') {
       const t = manager.state().totals;
       return json(res, 200, {
@@ -266,7 +281,7 @@ server.listen(PORT, HOST, () => {
   console.log(`  API docs   → ${base}/docs${TOKEN ? `?token=${encodeURIComponent(TOKEN)}` : ''}`);
   console.log(`  Écoute sur ${HOST}:${PORT}${TOKEN ? '  · jeton requis' : '  · sans authentification'}`);
   if (HOST === '0.0.0.0' && !TOKEN) {
-    console.log('  ⚠  Serveur exposé SANS jeton. Définis RAUVALIA_TOKEN avant de l’ouvrir vers l’extérieur.');
+    console.log('  ATTENTION : Serveur exposé SANS jeton. Définis RAUVALIA_TOKEN avant de l’ouvrir vers l’extérieur.');
   }
   console.log('');
 });

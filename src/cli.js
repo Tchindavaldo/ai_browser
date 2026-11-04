@@ -40,7 +40,7 @@ const res = await runAgent({
     if (e.type === 'thought') console.log(`${C.dim}[${e.step}] ${e.text}${C.r}`);
     if (e.type === 'action') console.log(`${C.cyan}→ ${e.name}${C.r} ${JSON.stringify(e.args)}`);
     if (e.type === 'result') console.log(`${C.dim}  ${e.output.split('\n')[0]}${C.r}`);
-    if (e.type === 'done') console.log(`${e.success ? C.green + '✓' : C.red + '✗'} ${e.result}${C.r}`);
+    if (e.type === 'done') console.log(`${e.success ? C.green + 'OK' : C.red + 'ECHEC'} ${e.result}${C.r}`);
   }
 });
 

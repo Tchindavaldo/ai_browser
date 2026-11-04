@@ -138,7 +138,7 @@ Une barre d'onglets liste les conversations. Deux façons d'en créer une :
 
 Les sessions tournent **en parallèle** : une tâche peut travailler pendant qu'on discute
 dans une autre. Un point orange sur l'onglet signale celles qui travaillent. Cliquer sur un
-onglet bascule dessus et rejoue son historique (chat + activité) ; `✕` la ferme, et le
+onglet bascule dessus et rejoue son historique (chat + activité) ; le bouton de fermeture la ferme, et le
 navigateur se ferme tout seul quand son dernier onglet part.
 
 ### Couper et nettoyer
@@ -146,7 +146,7 @@ navigateur se ferme tout seul quand son dernier onglet part.
 - **■ Couper la tâche** — interrompt la tâche en cours : la requête au modèle est annulée
   et la boucle s'arrête entre deux actions. L'historique note l'interruption, donc la
   conversation reste utilisable derrière.
-- **🧹 Nettoyer la session** — vide l'historique et repart sur une page blanche, sans
+- **Nettoyer la session** — vide l'historique et repart sur une page blanche, sans
   fermer le navigateur.
 
 ### Captures livrées par l'agent
