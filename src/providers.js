@@ -76,7 +76,7 @@ function acceptsImages(p, m, id) {
   return VISION_NAME.test(id);
 }
 
-/** Liste des modèles d'un fournisseur : [{ id, free, vision }], gratuits d'abord. */
+/** Liste des modèles d'un fournisseur : [{ id, free, vision, inputs }], gratuits d'abord. */
 export async function listModels(p, key) {
   const res = await fetch(`${p.base}/models`, { headers: key ? { authorization: `Bearer ${key}` } : {} });
   if (!res.ok) throw new Error(`${res.status} ${(await res.text()).slice(0, 200)}`);
@@ -94,7 +94,11 @@ export async function listModels(p, key) {
       if (/embedding|imagen|veo|tts|image/.test(id)) continue;
     }
     if (/whisper|embed|guard|tts|transcribe|orpheus/i.test(id)) continue;
-    out.push({ id, free: isFree(p, m), vision: acceptsImages(p, m, id) });
+    const vision = acceptsImages(p, m, id);
+    // Types d'entrée : donnés par l'API quand elle le dit (OpenRouter), sinon texte (+ image).
+    const mods = m.architecture?.input_modalities;
+    const inputs = Array.isArray(mods) && mods.length ? [...new Set(['text', ...mods])] : vision ? ['text', 'image'] : ['text'];
+    out.push({ id, free: isFree(p, m), vision, inputs });
   }
   return out.sort((a, b) => (b.free - a.free) || a.id.localeCompare(b.id));
 }

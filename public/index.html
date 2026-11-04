@@ -902,7 +902,14 @@ setInterval(() => {
 
 /* ================= modèles IA ================= */
 // Chaque ligne de liste déroulante indique ce que le modèle accepte en entrée.
-const modelLabel = (m) => `[${m.vision ? 'texte + image' : 'texte seul'}]  ${m.id}${m.free ? '  -  gratuit' : ''}`;
+const INPUT_FR = { text: 'texte', image: 'image', audio: 'audio', video: 'vidéo', file: 'fichier' };
+const inputsLabel = (m) => {
+  const ins = m.inputs ?? (m.vision ? ['text', 'image'] : ['text']);
+  return ins.length === 1 && ins[0] === 'text' ? 'texte seul' : ins.map((x) => INPUT_FR[x] ?? x).join(' + ');
+};
+const modelLabel = (m) => `[${inputsLabel(m)}]  ${m.id}${m.free ? '  -  gratuit' : ''}`;
+/** Infos d'un modèle de la liste (types d'entrée), si la liste de l'hébergeur est déjà chargée. */
+const modelInfo = (e) => MODEL_CACHE[e.provider]?.find((x) => x.id === e.model);
 
 /* --- modèle choisi pour la session active (à côté de Go) --- */
 const MODEL_CACHE = {};
@@ -914,6 +921,7 @@ async function providerModels(pid) {
   return MODEL_CACHE[pid];
 }
 let SM_SHOWN = '';
+let SM_FULL = false;  // true : l'utilisateur parcourt toute la liste d'un hébergeur
 async function syncSessionModel(force) {
   if (!LLM.providers.length) return;
   const a = active();
@@ -922,12 +930,25 @@ async function syncSessionModel(force) {
   if (key === SM_SHOWN && !force) return;
   SM_SHOWN = key;
   const def = LLM.chain[0];
+  // « Notre liste » : les modèles configurés dans la vue Modèles IA, choisis en un clic.
+  const chainOpts = LLM.chain.map((e, i) => {
+    const info = modelInfo(e);
+    return `<option value="chain:${i}">${esc(pname(e.provider))} · ${esc(e.model)}${info ? '  [' + esc(inputsLabel(info)) + ']' : ''}</option>`;
+  }).join('');
   $('sProv').innerHTML = `<option value="">Par défaut${def ? ' : ' + esc(pname(def.provider)) + ' · ' + esc(def.model) : ''}</option>`
+    + `<optgroup label="Notre liste de modèles">${chainOpts}</optgroup>`
+    + `<optgroup label="Autre hébergeur (toute sa liste)">`
     + [...LLM.providers].sort((x, y) => y.hasKey - x.hasKey)
-        .map((p) => `<option value="${p.id}">${esc(p.name)}${p.hasKey ? '' : ' (pas de clé)'}</option>`).join('');
-  $('sProv').value = m?.provider ?? '';
+        .map((p) => `<option value="${p.id}">${esc(p.name)}${p.hasKey ? '' : ' (pas de clé)'}</option>`).join('')
+    + `</optgroup>`;
   $('sProv').disabled = $('sModel').disabled = !a;
-  if (!m) { $('sModel').hidden = true; return; }
+  const ci = m ? LLM.chain.findIndex((e) => e.provider === m.provider && e.model === m.model) : -1;
+  if (!m || (ci >= 0 && !SM_FULL)) {
+    $('sProv').value = m ? `chain:${ci}` : '';
+    $('sModel').hidden = true;
+    return;
+  }
+  $('sProv').value = m.provider;
   const list = await providerModels(m.provider);
   const opts = list.some((x) => x.id === m.model) ? list : [{ id: m.model, free: false, vision: false }, ...list];
   $('sModel').innerHTML = opts.slice(0, 600).map((x) => `<option value="${esc(x.id)}">${esc(modelLabel(x))}</option>`).join('');
@@ -940,7 +961,13 @@ async function setSessionModel(provider, model) {
 }
 $('sProv').onchange = async () => {
   const pid = $('sProv').value;
+  SM_FULL = false;
   if (!pid) return setSessionModel(null, null);
+  if (pid.startsWith('chain:')) {
+    const e = LLM.chain[+pid.slice(6)];
+    return setSessionModel(e.provider, e.model);
+  }
+  SM_FULL = true;
   const list = await providerModels(pid);
   const p = LLM.providers.find((x) => x.id === pid);
   // Premier modèle gratuit de l'hébergeur, sinon son modèle par défaut.
@@ -972,12 +999,16 @@ function renderLlm() {
     const cd = LLM.cooldowns[`${e.provider}|${e.model}`];
     return `<div class="mrow"><span class="rank">${i + 1}</span>
       <span class="name"><b>${esc(pname(e.provider))}</b> · ${esc(e.model)}</span>
+      <span class="badge">${MODEL_CACHE[e.provider] ? (modelInfo(e) ? esc(inputsLabel(modelInfo(e))) : 'entrées inconnues') : '...'}</span>
       ${i === 0 ? '<span class="badge">principal</span>' : ''}
       ${cd ? `<span class="badge ko">épuisé, reprise dans ${cd} min</span>` : ''}
       <button class="btn" data-mv="${i}" data-d="-1" ${i === 0 ? 'disabled' : ''}>Monter</button>
       <button class="btn" data-mv="${i}" data-d="1" ${i === LLM.chain.length - 1 ? 'disabled' : ''}>Descendre</button>
       <button class="btn danger" data-rm="${i}" ${LLM.chain.length === 1 ? 'disabled' : ''}>Retirer</button></div>`;
   }).join('');
+  // Charge les listes des hébergeurs de la chaîne pour afficher les types d'entrée.
+  const missing = [...new Set(LLM.chain.map((e) => e.provider))].filter((pid) => !MODEL_CACHE[pid]);
+  if (missing.length) Promise.all(missing.map(providerModels)).then(() => { renderLlm(); SM_SHOWN = ''; syncSessionModel(); });
   $('mBtnFallback').textContent = LLM.fallback ? 'Bascule automatique : activée' : 'Bascule automatique : désactivée';
   const sorted = [...LLM.providers].sort((a, b) => b.hasKey - a.hasKey);
   const cur = $('mProv').value;
