@@ -26,6 +26,9 @@ Règles :
 - Ne devine pas d'URL internes d'un parcours (inscription, paiement…) : y aller directement fait
   souvent perdre la progression et renvoie à l'accueil. Avance avec les boutons de la page. Si tu
   es renvoyé en arrière, reprends le parcours depuis là où tu es.
+- Si l'état du navigateur signale une erreur de lecture (page figée ou en chargement), ne recharge
+  pas d'office : regarde d'abord la capture jointe si tu en as une ; si la page est bien là, continue,
+  sinon attends quelques secondes (wait), et ne recharge qu'en dernier recours (tu perdrais la saisie).
 - Si une action a réussi mais que la page ne change pas, vérifie d'abord ce qu'elle demande
   (champ obligatoire vide, choix à faire, message d'erreur, case à cocher) avant de recommencer.
 - Quand l'objectif est atteint, ou impossible après ces essais, appelle done avec le résultat.
@@ -146,7 +149,10 @@ export class Session {
         }
 
         this.#check();
-        const state = `ÉTAT DU NAVIGATEUR:\n${renderSnapshot(await this.tab.snapshot())}`;
+        const snap = await this.tab.snapshot();
+        const state = `ÉTAT DU NAVIGATEUR:\n${renderSnapshot(snap)}`;
+        // Lecture de la page impossible (page figée, en plein chargement) : la capture montre où elle en est.
+        if (snap.error && !failed) failed = 'lecture de la page';
         // Capture de la page : après un échec, sur demande (outil screenshot) ou à chaque étape si l'option est active.
         let shot = null;
         // Inutile de capturer si le modèle prévu ne lit pas les images.
@@ -160,7 +166,9 @@ export class Session {
         stripOldImages(this.messages);
         if (shot) {
           const area = shot.full ? 'la page entière' : 'la zone visible (page entière impossible)';
-          const why = failed ? `L'action ${failed} a échoué. Voici ${area} telle qu'elle est affichée.`
+          const why = failed === 'lecture de la page'
+            ? `La lecture de la page n'a pas abouti. Voici ${area} telle qu'elle est affichée : regarde-la avant de décider d'attendre ou de recharger.`
+            : failed ? `L'action ${failed} a échoué. Voici ${area} telle qu'elle est affichée.`
             : `Capture de ${area} telle qu'elle est affichée.`;
           this.messages.push({ role: 'user', content: [
             { type: 'text', text: state },
