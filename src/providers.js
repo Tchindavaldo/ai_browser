@@ -29,7 +29,7 @@ export const PROVIDERS = [
   },
   {
     id: 'gemini', name: 'Google Gemini', base: 'https://generativelanguage.googleapis.com/v1beta/openai',
-    env: 'GEMINI_API_KEY', defaultModel: 'gemini-3.8-flash',
+    env: 'GEMINI_API_KEY', defaultModel: 'gemini-3.5-flash',
     keyUrl: 'https://aistudio.google.com/apikey', allFree: true,
     free: 'Modèles Google uniquement. Flash gratuit avec limites, Pro payant.'
   },

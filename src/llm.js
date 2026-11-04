@@ -77,7 +77,11 @@ async function callOne(entry, { messages, tools, temperature, signal }) {
 
   const headers = { 'content-type': 'application/json', authorization: `Bearer ${key}` };
   if (p.id === 'openrouter') headers['x-title'] = 'AI Browser';
-  const body = { model: entry.model, messages, temperature };
+  // Gemini refuse un contenu null (messages d'appel d'outil) et les champs qu'il ne connaît pas.
+  const msgs = p.id === 'gemini'
+    ? messages.map(({ reasoning_content, ...m }) => (m.content == null ? { ...m, content: '' } : m))
+    : messages;
+  const body = { model: entry.model, messages: msgs, temperature };
   if (tools?.length) Object.assign(body, { tools, tool_choice: 'auto' });
 
   let lastErr;
