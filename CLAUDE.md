@@ -31,3 +31,9 @@ Ex `rauvalia-web`, déplacé ici. Dépôt GitHub : `Tchindavaldo/ai_browser`.
 - `src/llm.js` : chaîne de modèles avec bascule automatique ; un modèle en quota épuisé
   (HTTP 402/429) est sauté pendant 10 minutes. Réglages dans `llm-settings.json`.
 - Vue « Modèles IA » de l'interface (icône du rail, tuile « Modèle IA » du tableau de bord).
+- Captures pour les modèles qui lisent les images (`src/agent.js`) : après une action en échec,
+  quand l'agent appelle screenshot, ou à chaque étape si l'option « Capture à chaque étape » de la
+  session est cochée, une capture de la page entière est jointe. Une seule image gardée dans
+  l'historique ; `src/llm.js` la retire pour les modèles texte seul.
+- Le modèle qui a réellement répondu s'affiche à chaque étape (« bascule vers ... » s'il diffère
+  du modèle prévu) et dans le tableau de bord.

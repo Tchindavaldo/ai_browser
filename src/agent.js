@@ -1,6 +1,6 @@
 import { BrowserHost, renderSnapshot } from './browser.js';
 import { TOOL_SCHEMAS, runTool } from './tools.js';
-import { chat } from './llm.js';
+import { chat, modelName } from './llm.js';
 
 const SYSTEM = `Tu es Rauvalia, un agent qui pilote un vrai navigateur web pour accomplir un objectif.
 
@@ -21,6 +21,10 @@ Règles :
 - Ne devine pas de données personnelles : n'utilise que celles fournies dans l'objectif.
 - Quand l'objectif est atteint — ou définitivement impossible — appelle done avec le résultat.
 - N'appelle qu'un seul outil à la fois.
+- Quand une action échoue, une capture de la page entière peut t'être jointe (si tu lis les images).
+  Regarde-la pour comprendre la cause (fenêtre qui recouvre, élément dessiné autrement, message
+  d'erreur affiché, page différente de ce que tu crois) et change de méthode au lieu de répéter
+  la même action : autre élément, libellé associé, touche clavier, eval_js, scroll.
 
 La conversation continue après chaque done : l'utilisateur peut enchaîner sur une nouvelle
 demande, et le navigateur reste sur la page où tu l'as laissé. Tiens compte de l'historique.`;
@@ -37,6 +41,7 @@ export class Session {
   constructor({ tab, maxSteps = 40 } = {}) {
     this.tab = tab;
     this.model = null; // { provider, model } choisi pour cette session, sinon la chaîne par défaut
+    this.shotEveryStep = false; // true : capture de la page envoyée au modèle à chaque étape
     this.maxSteps = maxSteps;
     this.messages = [{ role: 'system', content: SYSTEM }];
     this.busy = false;
@@ -78,6 +83,11 @@ export class Session {
         const msg = await chat({ messages: this.messages, tools: TOOL_SCHEMAS, signal: this.ac.signal, prefer: this.model });
         this.#check();
         this.messages.push(msg);
+        if (msg.usedModel) {
+          const u = msg.usedModel;
+          this.usingModel = modelName(u);
+          onEvent({ type: 'model', step, provider: u.provider, model: u.model, text: modelName(u) });
+        }
 
         // reasoning_content : chaîne de pensée des modèles « reasoner ».
         if (msg.reasoning_content) onEvent({ type: 'thought', step, text: msg.reasoning_content });
@@ -92,6 +102,7 @@ export class Session {
           continue;
         }
 
+        let failed = null, wantShot = false;
         for (const call of calls) {
           this.#check();
           let args = {};
@@ -114,7 +125,9 @@ export class Session {
             const r = await runTool(this.tab, name, params);
             // Certains outils produisent un livrable (capture d'écran…) en plus de leur sortie texte.
             if (r && typeof r === 'object') { output = r.output; artifact = r.artifact; } else output = r;
+            if (r?.seen) wantShot = true;
           } catch (e) { output = `ERREUR: ${String(e.message).slice(0, 600)}`; }
+          if (String(output).startsWith('ERREUR')) failed = name;
 
           if (artifact) onEvent({ type: 'artifact', step, ...artifact });
           onEvent({ type: 'result', step, name, output: String(output).slice(0, 400) });
@@ -122,10 +135,25 @@ export class Session {
         }
 
         this.#check();
-        this.messages.push({
-          role: 'user',
-          content: `ÉTAT DU NAVIGATEUR:\n${renderSnapshot(await this.tab.snapshot())}`
-        });
+        const state = `ÉTAT DU NAVIGATEUR:\n${renderSnapshot(await this.tab.snapshot())}`;
+        // Capture de la page : après un échec, sur demande (outil screenshot) ou à chaque étape si l'option est active.
+        let shot = null;
+        if (failed || wantShot || this.shotEveryStep) {
+          shot = await this.tab.pageShotForModel().catch(() => null);
+        }
+        stripOldImages(this.messages);
+        if (shot) {
+          const why = failed ? `L'action ${failed} a échoué. Voici la page entière telle qu'elle est affichée.`
+            : 'Capture de la page entière telle qu\'elle est affichée.';
+          this.messages.push({ role: 'user', content: [
+            { type: 'text', text: state },
+            { type: 'text', text: why },
+            { type: 'image_url', image_url: { url: `data:image/jpeg;base64,${shot}` } }
+          ] });
+          onEvent({ type: 'result', step, name: 'capture', output: failed ? 'Capture de la page envoyée au modèle après l\'échec.' : 'Capture de la page envoyée au modèle.' });
+        } else {
+          this.messages.push({ role: 'user', content: state });
+        }
         trimHistory(this.messages);
       }
 
@@ -157,6 +185,15 @@ export async function runAgent({ objective, maxSteps = 40, headless = false, eng
     return await s.run(objective, { onEvent, maxSteps });
   } finally {
     await host.close();
+  }
+}
+
+/** Une seule image à la fois dans l'historique : les anciennes captures redeviennent du texte. */
+function stripOldImages(messages) {
+  for (const m of messages) {
+    if (Array.isArray(m.content)) {
+      m.content = m.content.filter((p) => p.type === 'text').map((p) => p.text).join('\n') + '\n(capture retirée)';
+    }
   }
 }
 

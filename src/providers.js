@@ -29,7 +29,7 @@ export const PROVIDERS = [
   },
   {
     id: 'gemini', name: 'Google Gemini', base: 'https://generativelanguage.googleapis.com/v1beta/openai',
-    env: 'GEMINI_API_KEY', defaultModel: 'gemini-2.5-flash',
+    env: 'GEMINI_API_KEY', defaultModel: 'gemini-3.8-flash',
     keyUrl: 'https://aistudio.google.com/apikey', allFree: true,
     free: 'Modèles Google uniquement. Flash gratuit avec limites, Pro payant.'
   },
@@ -75,6 +75,9 @@ function acceptsImages(p, m, id) {
   if (p.id === 'deepseek') return false;
   return VISION_NAME.test(id);
 }
+
+/** Devine d'après le nom si un modèle lit les images (quand la liste de l'hébergeur ne le dit pas). */
+export const guessVision = (p, id) => acceptsImages(p, {}, id);
 
 /** Liste des modèles d'un fournisseur : [{ id, free, vision, inputs }], gratuits d'abord. */
 export async function listModels(p, key) {

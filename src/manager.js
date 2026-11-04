@@ -25,7 +25,7 @@ export class Manager {
     const e = { ...event, sessionId, ts: Date.now() };
     const s = this.sessions.get(sessionId);
 
-    if (s && ['title', 'thought', 'action', 'result', 'artifact', 'done', 'user', 'system'].includes(event.type)) {
+    if (s && ['title', 'model', 'thought', 'action', 'result', 'artifact', 'done', 'user', 'system'].includes(event.type)) {
       s.events.push(e);
       if (s.events.length > 600) s.events.shift();
       this.#track(s, e);
@@ -169,6 +169,8 @@ export class Manager {
       headless: this.hosts.get(s.hostId)?.headless,
       busy: s.session.busy,
       model: s.session.model,
+      shots: !!s.session.shotEveryStep,
+      using: s.session.usingModel ?? null,
       url: safeUrl(s.tab),
       createdAt: s.createdAt,
       ...s.stats

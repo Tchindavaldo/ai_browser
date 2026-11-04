@@ -202,6 +202,14 @@ const server = http.createServer(async (req, res) => {
     }
 
     // --- Modèle choisi pour une session (null = chaîne par défaut) ---
+    if (url.pathname === '/api/session/shots' && req.method === 'POST') {
+      const body = await readBody(req);
+      const rec = manager.sessions.get(body.id ?? manager.activeId);
+      if (!rec) return json(res, 404, { error: 'session inconnue' });
+      rec.session.shotEveryStep = !!body.on;
+      broadcast({ type: 'sessions', ...manager.state() });
+      return json(res, 200, { ok: true, shots: rec.session.shotEveryStep });
+    }
     if (url.pathname === '/api/session/model' && req.method === 'POST') {
       const body = await readBody(req);
       const rec = manager.sessions.get(body.id ?? manager.activeId);

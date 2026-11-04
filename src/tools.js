@@ -93,29 +93,29 @@ export async function runTool(tab, name, args) {
 
     case 'click': {
       const l = browser.loc(args.ref);
-      await l.scrollIntoViewIfNeeded({ timeout: 5000 }).catch(() => {});
-      await l.click({ timeout: 10000 });
+      await l.scrollIntoViewIfNeeded({ timeout: 2000 }).catch(() => {});
+      await l.click({ timeout: 4000 });
       await page.waitForTimeout(500);
       return `Clic sur [${args.ref}] effectué. URL: ${page.url()}`;
     }
 
     case 'type': {
       const l = browser.loc(args.ref);
-      await l.scrollIntoViewIfNeeded({ timeout: 5000 }).catch(() => {});
-      await l.fill('', { timeout: 10000 }).catch(() => {});
-      await l.fill(args.text, { timeout: 10000 });
+      await l.scrollIntoViewIfNeeded({ timeout: 2000 }).catch(() => {});
+      await l.fill('', { timeout: 4000 }).catch(() => {});
+      await l.fill(args.text, { timeout: 4000 });
       if (args.submit) { await l.press('Enter'); await page.waitForTimeout(800); }
       return `Saisi ${JSON.stringify(args.text)} dans [${args.ref}]${args.submit ? ' + Entrée' : ''}`;
     }
 
     case 'select':
-      await browser.loc(args.ref).selectOption({ label: args.value }).catch(async () => {
-        await browser.loc(args.ref).selectOption(args.value);
+      await browser.loc(args.ref).selectOption({ label: args.value }, { timeout: 4000 }).catch(async () => {
+        await browser.loc(args.ref).selectOption(args.value, { timeout: 4000 });
       });
       return `Option ${JSON.stringify(args.value)} sélectionnée dans [${args.ref}]`;
 
     case 'check':
-      await browser.loc(args.ref).setChecked(args.checked, { timeout: 10000 });
+      await browser.loc(args.ref).setChecked(args.checked, { timeout: 4000 });
       return `[${args.ref}] ${args.checked ? 'coché' : 'décoché'}`;
 
     case 'press_key':
@@ -152,7 +152,8 @@ export async function runTool(tab, name, args) {
     case 'screenshot': {
       const cap = await tab.saveCapture({ fullPage: !!args.full_page, label: args.label });
       return {
-        output: `Capture enregistrée et envoyée à l'utilisateur : ${cap.name} (${Math.round(cap.bytes / 1024)} Ko, ${cap.fullPage ? 'page entière' : 'zone visible'}) — ${cap.pageUrl}`,
+        seen: true,
+        output: `Capture enregistrée et envoyée à l'utilisateur (tu la verras aussi si ton modèle lit les images) : ${cap.name} (${Math.round(cap.bytes / 1024)} Ko, ${cap.fullPage ? 'page entière' : 'zone visible'}) — ${cap.pageUrl}`,
         artifact: { kind: 'image', ...cap }
       };
     }

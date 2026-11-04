@@ -339,6 +339,7 @@ form textarea { flex: 1; resize: none; max-height: 140px; padding: 9px 12px; bor
 .smodel .lbl { color: var(--muted); font-size: 11px; text-transform: uppercase; letter-spacing: .07em; font-weight: 600; }
 .smodel select { min-width: 0; max-width: 100%; }
 .smodel #sModel { flex: 1 1 260px; }
+.sshots { display: flex; align-items: center; gap: 6px; color: var(--muted); font-size: 12px; cursor: pointer; white-space: nowrap; }
 
 .rgrid { display: grid; grid-template-rows: 1fr 1fr; min-height: 0; }
 .rgrid > .pane + .pane { border-left: 0; border-top: 1px solid var(--line); }
@@ -352,6 +353,8 @@ form textarea { flex: 1; resize: none; max-height: 140px; padding: 9px 12px; bor
 .step:last-child { border-left-color: var(--accent); }
 .step .n { display: inline-block; color: var(--faint); font-family: var(--mono); font-size: 10.5px;
   letter-spacing: .06em; margin-bottom: 4px; }
+.step .n .mdl { color: var(--muted); font-family: var(--mono); font-size: 11px; margin-left: 8px; }
+.step .n .mdl.sw { color: var(--warn, #d29922); }
 .step .n .ttl { color: var(--fg); font-family: ui-sans-serif, system-ui, sans-serif; font-size: 12.5px; font-weight: 600; margin-left: 6px; }
 .step .n .dur { color: var(--muted); margin-left: 8px; }
 .step .why { white-space: pre-wrap; color: var(--fg-soft); margin-bottom: 7px; font-size: 12.5px; }
@@ -519,6 +522,9 @@ form textarea { flex: 1; resize: none; max-height: 140px; padding: 9px 12px; bor
           <span class="lbl">Modèle de cette session</span>
           <select id="sProv" title="Hébergeur du modèle"></select>
           <select id="sModel" title="Modèle" hidden></select>
+          <label class="sshots" title="Si le modèle lit les images, il reçoit une capture de la page entière à chaque étape (sinon seulement après une erreur)">
+            <input type="checkbox" id="sShots"> Capture à chaque étape
+          </label>
         </div>
         <form id="form">
           <textarea id="input" rows="2" placeholder="Décris l'objectif — l'agent navigue, scrape et remplit les formulaires lui-même"></textarea>
@@ -619,6 +625,7 @@ function renderDash() {
             <div class="nm">${esc(s.title)}
               <span class="chip ${s.busy ? 'run' : 'idle'}">${s.busy ? 'en cours · étape ' + (s.steps || 1) : 'prête'}</span></div>
             <div class="url">${esc(s.url && s.url !== 'about:blank' ? s.url : 'page blanche')}</div>
+            ${s.using ? `<div class="url">modèle utilisé : ${esc(s.using)}</div>` : ''}
             ${doing}
           </div>
           <div class="acts">
@@ -676,7 +683,8 @@ const say = (cls, html) => {
   return d;
 };
 let curStep = null, curEl = null;
-let runStart = null;            // horodatage du message qui a lancé la tâche
+let runStart = null;
+let lastModel = null;           // dernier modèle affiché, pour repérer les bascules            // horodatage du message qui a lancé la tâche
 const fmtDur = (ms) => {
   const s = Math.max(0, Math.round(ms / 1000));
   return s < 60 ? `${(ms / 1000).toFixed(1).replace('.', ',')} s` : `${Math.floor(s / 60)} min ${String(s % 60).padStart(2, '0')} s`;
@@ -692,7 +700,7 @@ function stepEl(n, ts) {
   $('brain').querySelector('.empty')?.remove();
   const d = document.createElement('div');
   d.className = 'step';
-  d.innerHTML = `<span class="n">ÉTAPE ${n ?? '—'}<span class="ttl"></span><span class="dur"></span></span>`;
+  d.innerHTML = `<span class="n">ÉTAPE ${n ?? '—'}<span class="ttl"></span><span class="mdl"></span><span class="dur"></span></span>`;
   if (ts) d.dataset.start = ts;
   $('brain').appendChild(d); curStep = n; curEl = d;
   return d;
@@ -701,6 +709,19 @@ function stepEl(n, ts) {
 function apply(ev) {
   const brain = $('brain');
   if (ev.type === 'user') { runStart = ev.ts ?? Date.now(); return void say('me', esc(ev.text)); }
+  if (ev.type === 'model') {
+    // Modèle qui a réellement répondu à cette étape ; signalé quand il change (bascule).
+    const el = stepEl(ev.step, ev.ts).querySelector('.mdl');
+    // Modèle prévu : celui choisi pour la session, sinon le premier de la chaîne.
+    const want = active()?.model ?? LLM.chain?.[0];
+    const wantName = want ? `${pname(want.provider)} · ${want.model}` : null;
+    const switched = (wantName && wantName !== ev.text) || (lastModel && lastModel !== ev.text);
+    el.textContent = switched ? `bascule vers ${ev.text}` : ev.text;
+    el.title = switched && wantName ? `Modèle prévu : ${wantName}` : '';
+    el.classList.toggle('sw', !!switched);
+    lastModel = ev.text;
+    return;
+  }
   if (ev.type === 'title') {
     stepEl(ev.step, ev.ts).querySelector('.ttl').textContent = ev.text;
     return;
@@ -742,7 +763,7 @@ function apply(ev) {
     closeStep(ev.ts);
     const total = runStart && ev.ts ? `<div class="dur-total">Durée totale : ${fmtDur(ev.ts - runStart)}${ev.steps ? ` · ${ev.steps} étape${ev.steps > 1 ? 's' : ''}` : ''}</div>` : '';
     say('done' + (ev.success ? '' : ' ko'), esc(ev.result) + total);
-    $('stepTxt').textContent = ''; curStep = null; curEl = null; runStart = null;
+    $('stepTxt').textContent = ''; curStep = null; curEl = null; runStart = null; lastModel = null;
   }
 }
 
@@ -800,6 +821,7 @@ es.onmessage = (e) => {
   if (s) {
     if (ev.type === 'user') { s.busy = true; s.objective = ev.text; s.steps = 0; s.lastAction = null; s.lastResult = null; }
     if (ev.type === 'action') { s.busy = true; s.steps = ev.step ?? s.steps; s.lastAction = { name: ev.name, args: ev.args }; s.actions = (s.actions ?? 0) + 1; }
+    if (ev.type === 'model') s.using = ev.text;
     if (ev.type === 'done') { s.busy = false; s.lastAction = null; s.lastResult = { success: ev.success, result: ev.result }; }
     if (['user', 'action', 'done'].includes(ev.type)) {
       ST.feed = [{ ...ev, title: s.title }, ...(ST.feed ?? [])].slice(0, 40);
@@ -926,7 +948,7 @@ async function syncSessionModel(force) {
   if (!LLM.providers.length) return;
   const a = active();
   const m = a?.model;
-  const key = `${a?.id}|${m?.provider ?? ''}|${m?.model ?? ''}`;
+  const key = `${a?.id}|${m?.provider ?? ''}|${m?.model ?? ''}|${a?.shots}`;
   if (key === SM_SHOWN && !force) return;
   SM_SHOWN = key;
   const def = LLM.chain[0];
@@ -941,7 +963,8 @@ async function syncSessionModel(force) {
     + [...LLM.providers].sort((x, y) => y.hasKey - x.hasKey)
         .map((p) => `<option value="${p.id}">${esc(p.name)}${p.hasKey ? '' : ' (pas de clé)'}</option>`).join('')
     + `</optgroup>`;
-  $('sProv').disabled = $('sModel').disabled = !a;
+  $('sProv').disabled = $('sModel').disabled = $('sShots').disabled = !a;
+  $('sShots').checked = !!a?.shots;
   const ci = m ? LLM.chain.findIndex((e) => e.provider === m.provider && e.model === m.model) : -1;
   if (!m || (ci >= 0 && !SM_FULL)) {
     $('sProv').value = m ? `chain:${ci}` : '';
@@ -973,6 +996,10 @@ $('sProv').onchange = async () => {
   // Premier modèle gratuit de l'hébergeur, sinon son modèle par défaut.
   const pick = list.find((x) => x.free)?.id ?? list[0]?.id ?? p.defaultModel;
   setSessionModel(pid, pick);
+};
+$('sShots').onchange = async () => {
+  await post('/api/session/shots', { id: ST.activeId, on: $('sShots').checked });
+  await refresh();
 };
 $('sModel').onchange = () => setSessionModel($('sProv').value, $('sModel').value);
 

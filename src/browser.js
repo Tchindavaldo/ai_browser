@@ -204,6 +204,20 @@ export class Tab {
   }
 
   /**
+   * Capture de la page entière pour le modèle (pas seulement la zone visible).
+   * Hauteur plafonnée pour que l'image reste lisible une fois réduite par le modèle.
+   */
+  async pageShotForModel(maxHeight = 6000) {
+    const h = await this.page.evaluate(() => Math.max(document.documentElement.scrollHeight, document.body?.scrollHeight ?? 0)).catch(() => 0);
+    const vp = this.page.viewportSize() ?? { width: 1280, height: 800 };
+    const opts = { type: 'jpeg', quality: 55, timeout: 8000 };
+    if (h > maxHeight) Object.assign(opts, { fullPage: true, clip: { x: 0, y: 0, width: vp.width, height: maxHeight } });
+    else opts.fullPage = true;
+    const buf = await this.page.screenshot(opts);
+    return buf.toString('base64');
+  }
+
+  /**
    * Capture enregistrée sur disque, destinée à être livrée à l'utilisateur.
    * Retourne de quoi l'afficher et la télécharger.
    */

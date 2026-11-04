@@ -1,7 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { PROVIDERS, provider } from './providers.js';
+import { PROVIDERS, provider, listModels, guessVision } from './providers.js';
 
 /**
  * Appels IA avec une chaîne de modèles et bascule automatique.
@@ -108,6 +108,28 @@ async function callOne(entry, { messages, tools, temperature, signal }) {
   throw lastErr;
 }
 
+// Le modèle lit-il les images ? D'après la liste de l'hébergeur (gardée 1 h), sinon d'après son nom.
+const VISION = new Map(); // fournisseur -> { at, ids: Map(id -> vision) }
+async function readsImages(entry) {
+  const p = provider(entry.provider);
+  let c = VISION.get(p.id);
+  if (!c || Date.now() - c.at > 3600_000) {
+    try {
+      const list = await listModels(p, keyFor(p.id));
+      c = { at: Date.now(), ids: new Map(list.map((m) => [m.id, m.vision])) };
+      VISION.set(p.id, c);
+    } catch { c = null; }
+  }
+  return c?.ids.has(entry.model) ? c.ids.get(entry.model) : guessVision(p, entry.model);
+}
+
+/** Pour un modèle texte seul, les captures sont retirées et remplacées par une note. */
+function textOnly(messages) {
+  return messages.map((m) => Array.isArray(m.content)
+    ? { ...m, content: m.content.filter((x) => x.type === 'text').map((x) => x.text).join('\n') + '\n(capture non envoyée : ce modèle ne lit pas les images)' }
+    : m);
+}
+
 let lastUsed = null;
 
 /** Appel chat/completions compatible OpenAI, en suivant la chaîne de modèles. */
@@ -123,8 +145,12 @@ export async function chat({ messages, tools, temperature = 0, signal, prefer })
   const errors = [];
   for (const entry of ready.length ? ready : chain) {
     try {
-      const msg = await callOne(entry, { messages, tools, temperature, signal });
+      const hasImage = messages.some((m) => Array.isArray(m.content));
+      const msgs = hasImage && !(await readsImages(entry)) ? textOnly(messages) : messages;
+      const msg = await callOne(entry, { messages: msgs, tools, temperature, signal });
       lastUsed = entry;
+      // Modèle qui a répondu, invisible dans le JSON renvoyé aux API.
+      Object.defineProperty(msg, 'usedModel', { value: entry, enumerable: false });
       return msg;
     } catch (e) {
       if (e.name === 'AbortError') throw e;
@@ -148,7 +174,7 @@ export async function testChain() {
   return results;
 }
 
-export const modelName = () => {
-  const e = lastUsed ?? settings.chain[0];
+export const modelName = (entry) => {
+  const e = entry ?? lastUsed ?? settings.chain[0];
   return e ? `${provider(e.provider)?.name ?? e.provider} · ${e.model}` : 'aucun';
 };
