@@ -17,7 +17,7 @@ const FILE = process.env.RAUVALIA_SETTINGS || path.join(ROOT, 'llm-settings.json
 // Un modèle en quota épuisé ou limité est sauté pendant ce délai.
 const COOLDOWN_MS = 10 * 60 * 1000;
 // Temps maximum d'attente d'une réponse du modèle (au-delà, on passe au modèle suivant).
-const CALL_TIMEOUT_MS = 90 * 1000;
+const CALL_TIMEOUT_MS = 20 * 1000;
 const cooldown = new Map(); // "fournisseur|modèle" -> fin de pause (ms)
 
 function load() {

@@ -210,7 +210,7 @@ export class Tab {
                    scrollHeight: document.body?.scrollHeight ?? 0 };
         },
         { sel: INTERACTIVE, maxText, maxElements }
-      ), 20000, "lecture de la page");
+      ), 10000, "lecture de la page");
     } catch (err) {
       // Page en cours de navigation / contexte détruit : l'IA verra l'erreur brute.
       return { url, title: '', error: String(err.message).slice(0, 300), elements: [], text: '', ...drain() };
