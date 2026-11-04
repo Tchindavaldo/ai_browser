@@ -1,26 +1,31 @@
-# Déploiement Fly.io. Le nom de l'application est à choisir au premier « fly launch ».
-app = "ai-browser"
-primary_region = "cdg"
+# fly.toml app configuration file generated for ai-browser on 2026-11-04T14:35:49Z
+#
+# See https://fly.io/docs/reference/configuration/ for information about how to use this file.
+#
+
+app = 'ai-browser'
+primary_region = 'jnb'
 
 [build]
 
 [env]
-  RAUVALIA_HOST = "0.0.0.0"
-  RAUVALIA_PORT = "8080"
-  RAUVALIA_SETTINGS = "/data/llm-settings.json"
+  RAUVALIA_HOST = '0.0.0.0'
+  RAUVALIA_PORT = '8080'
+  RAUVALIA_SETTINGS = '/data/llm-settings.json'
+
+[[mounts]]
+  source = 'ai_browser_data'
+  destination = '/data'
 
 [http_service]
   internal_port = 8080
   force_https = true
-  auto_stop_machines = "stop"
+  auto_stop_machines = 'stop'
   auto_start_machines = true
   min_machines_running = 0
 
-# Disque permanent : garde les réglages des modèles IA entre deux redémarrages.
-[mounts]
-  source = "ai_browser_data"
-  destination = "/data"
-
 [[vm]]
-  memory = "2gb"
+  memory = '2gb'
+  cpu_kind = 'shared'
   cpus = 1
+  memory_mb = 1024
