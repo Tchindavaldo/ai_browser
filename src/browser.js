@@ -167,7 +167,7 @@ export class Tab {
 
     let data;
     try {
-      data = await this.page.evaluate(
+      data = await withTimeout(this.page.evaluate(
         ({ sel, maxText, maxElements }) => {
           const visible = (el) => {
             const r = el.getBoundingClientRect();
@@ -210,7 +210,7 @@ export class Tab {
                    scrollHeight: document.body?.scrollHeight ?? 0 };
         },
         { sel: INTERACTIVE, maxText, maxElements }
-      );
+      ), 20000, "lecture de la page");
     } catch (err) {
       // Page en cours de navigation / contexte détruit : l'IA verra l'erreur brute.
       return { url, title: '', error: String(err.message).slice(0, 300), elements: [], text: '', ...drain() };
@@ -304,4 +304,13 @@ export function renderSnapshot(s) {
   if (s.console?.length) L.push('', 'CONSOLE:', ...s.console.map((c) => '  ' + c));
   if (s.network?.length) L.push('', 'RÉSEAU (échecs / HTTP >= 400):', ...s.network.map((n) => '  ' + n));
   return L.join('\n');
+}
+
+/** Rejette si la promesse ne se termine pas à temps (page figée, script qui ne rend pas la main). */
+function withTimeout(promise, ms, what) {
+  let timer;
+  return Promise.race([
+    promise.finally(() => clearTimeout(timer)),
+    new Promise((_, reject) => { timer = setTimeout(() => reject(new Error(`${what} : pas de réponse en ${ms / 1000} s`)), ms); })
+  ]);
 }

@@ -16,6 +16,8 @@ const FILE = process.env.RAUVALIA_SETTINGS || path.join(ROOT, 'llm-settings.json
 
 // Un modèle en quota épuisé ou limité est sauté pendant ce délai.
 const COOLDOWN_MS = 10 * 60 * 1000;
+// Temps maximum d'attente d'une réponse du modèle (au-delà, on passe au modèle suivant).
+const CALL_TIMEOUT_MS = 90 * 1000;
 const cooldown = new Map(); // "fournisseur|modèle" -> fin de pause (ms)
 
 function load() {
@@ -88,10 +90,18 @@ async function callOne(entry, { messages, tools, temperature, signal }) {
   for (let attempt = 0; attempt < 3; attempt++) {
     if (attempt) await new Promise((r) => setTimeout(r, 1000 * 2 ** attempt));
     let res;
+    // Limite de temps : un modèle qui ne répond pas ne doit pas bloquer l'agent indéfiniment.
+    const limit = AbortSignal.timeout(CALL_TIMEOUT_MS);
     try {
-      res = await fetch(`${p.base}/chat/completions`, { method: 'POST', signal, headers, body: JSON.stringify(body) });
+      res = await fetch(`${p.base}/chat/completions`, {
+        method: 'POST', headers, body: JSON.stringify(body),
+        signal: signal ? AbortSignal.any([signal, limit]) : limit
+      });
     } catch (e) {
-      if (e.name === 'AbortError') throw e;
+      if (e.name === 'AbortError' && signal?.aborted) throw e;
+      if (e.name === 'TimeoutError' || limit.aborted) {
+        throw new Error(`${p.name} n'a pas répondu en ${CALL_TIMEOUT_MS / 1000} s`);
+      }
       lastErr = e; continue;
     }
     if (res.ok) {

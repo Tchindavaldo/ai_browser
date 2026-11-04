@@ -196,7 +196,11 @@ export async function runTool(tab, name, args) {
     }
 
     case 'eval_js': {
-      const r = await page.evaluate(new Function(args.code));
+      let timer;
+      const r = await Promise.race([
+        page.evaluate(new Function(args.code)).finally(() => clearTimeout(timer)),
+        new Promise((_, rej) => { timer = setTimeout(() => rej(new Error('le script ne rend pas la main après 30 s')), 30000); })
+      ]);
       // Un script sans « return » renvoie undefined : ce n'est pas une erreur.
       return r === undefined ? 'Script exécuté (aucune valeur renvoyée).' : String(JSON.stringify(r, null, 2)).slice(0, 20000);
     }
