@@ -34,6 +34,7 @@ Variables d'environnement :
 | `RAUVALIA_CLOUDFLARED` | `cloudflared` (PATH) | chemin du binaire pour `npm run tunnel` |
 | `RAUVALIA_ENGINE` | `chromium` | `firefox` \| `chromium` \| `edge` \| `chrome` \| `webkit` |
 | `RAUVALIA_FIREFOX_PATH` | — | binaire Firefox alternatif (voir ci-dessous) |
+| `RAUVALIA_CHROMIUM_PATH` | — | binaire Chromium alternatif, même contournement que Firefox (copie dans `C:\chromium`) |
 
 Un fichier `.env` à la racine du projet est chargé automatiquement (`--env-file-if-exists`).
 

@@ -16,6 +16,10 @@ const ENGINES = {
   chromium: {
     launcher: chromium,
     args: ['--disable-blink-features=AutomationControlled'],
+    // Même problème SxS que Firefox : le chrome.exe livré sous ms-playwright peut échouer
+    // au démarrage en fenêtre visible. Le copier vers un chemin simple (ex. C:\chromium)
+    // et pointer RAUVALIA_CHROMIUM_PATH dessus contourne le problème.
+    executablePath: process.env.RAUVALIA_CHROMIUM_PATH || undefined,
     userAgent:
       'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36'
   },
