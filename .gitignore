@@ -3,3 +3,4 @@ captures/
 .env
 *.log
 llm-settings.json
+fly-secrets.env
