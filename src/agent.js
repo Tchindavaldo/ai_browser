@@ -36,6 +36,7 @@ export class Cancelled extends Error {
 export class Session {
   constructor({ tab, maxSteps = 40 } = {}) {
     this.tab = tab;
+    this.model = null; // { provider, model } choisi pour cette session, sinon la chaîne par défaut
     this.maxSteps = maxSteps;
     this.messages = [{ role: 'system', content: SYSTEM }];
     this.busy = false;
@@ -74,7 +75,7 @@ export class Session {
 
       for (let step = 1; step <= maxSteps; step++) {
         this.#check();
-        const msg = await chat({ messages: this.messages, tools: TOOL_SCHEMAS, signal: this.ac.signal });
+        const msg = await chat({ messages: this.messages, tools: TOOL_SCHEMAS, signal: this.ac.signal, prefer: this.model });
         this.#check();
         this.messages.push(msg);
 

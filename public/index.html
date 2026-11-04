@@ -329,6 +329,12 @@ select:focus, input:focus, textarea:focus { outline: none; border-color: var(--a
 
 form { flex: none; display: flex; gap: 9px; padding: 12px; border-top: 1px solid var(--line); background: var(--surface); }
 form textarea { flex: 1; resize: none; max-height: 140px; padding: 9px 12px; border-radius: var(--r-sm); }
+.smodel { flex: none; display: flex; gap: 8px; align-items: center; flex-wrap: wrap; padding: 8px 12px 0;
+  border-top: 1px solid var(--line); background: var(--surface); }
+.smodel + form { border-top: 0; }
+.smodel .lbl { color: var(--muted); font-size: 11px; text-transform: uppercase; letter-spacing: .07em; font-weight: 600; }
+.smodel select { min-width: 0; max-width: 100%; }
+.smodel #sModel { flex: 1 1 260px; }
 
 .rgrid { display: grid; grid-template-rows: 1fr 1fr; min-height: 0; }
 .rgrid > .pane + .pane { border-left: 0; border-top: 1px solid var(--line); }
@@ -499,6 +505,11 @@ form textarea { flex: 1; resize: none; max-height: 140px; padding: 9px 12px; bor
           </button>
         </div>
         <div id="log"></div>
+        <div class="smodel">
+          <span class="lbl">Modèle de cette session</span>
+          <select id="sProv" title="Hébergeur du modèle"></select>
+          <select id="sModel" title="Modèle" hidden></select>
+        </div>
         <form id="form">
           <textarea id="input" rows="2" placeholder="Décris l'objectif — l'agent navigue, scrape et remplit les formulaires lui-même"></textarea>
           <button class="btn primary" id="send" style="height:auto;padding:0 18px">Go</button>
@@ -727,7 +738,7 @@ function renderWork() {
   renderStrip();
 }
 
-function render() { renderWork(); if (view === 'dash') renderDash();
+function render() { renderWork(); syncSessionModel(); if (view === 'dash') renderDash();
   const r = ST.totals?.running ?? 0;
   const pill = $('globalPill');
   pill.className = 'pill ' + (r ? 'live' : 'idle');
@@ -850,6 +861,54 @@ setInterval(async () => {
 setInterval(() => { if (view === 'dash') refreshThumbs(); }, 3000);
 
 /* ================= modèles IA ================= */
+// Chaque ligne de liste déroulante indique ce que le modèle accepte en entrée.
+const modelLabel = (m) => `[${m.vision ? 'texte + image' : 'texte seul'}]  ${m.id}${m.free ? '  -  gratuit' : ''}`;
+
+/* --- modèle choisi pour la session active (à côté de Go) --- */
+const MODEL_CACHE = {};
+async function providerModels(pid) {
+  if (!MODEL_CACHE[pid]) {
+    const r = await fetch('/api/llm/models?provider=' + pid);
+    MODEL_CACHE[pid] = r.ok ? await r.json() : [];
+  }
+  return MODEL_CACHE[pid];
+}
+let SM_SHOWN = '';
+async function syncSessionModel(force) {
+  if (!LLM.providers.length) return;
+  const a = active();
+  const m = a?.model;
+  const key = `${a?.id}|${m?.provider ?? ''}|${m?.model ?? ''}`;
+  if (key === SM_SHOWN && !force) return;
+  SM_SHOWN = key;
+  const def = LLM.chain[0];
+  $('sProv').innerHTML = `<option value="">Par défaut${def ? ' : ' + esc(pname(def.provider)) + ' · ' + esc(def.model) : ''}</option>`
+    + [...LLM.providers].sort((x, y) => y.hasKey - x.hasKey)
+        .map((p) => `<option value="${p.id}">${esc(p.name)}${p.hasKey ? '' : ' (pas de clé)'}</option>`).join('');
+  $('sProv').value = m?.provider ?? '';
+  $('sProv').disabled = $('sModel').disabled = !a;
+  if (!m) { $('sModel').hidden = true; return; }
+  const list = await providerModels(m.provider);
+  const opts = list.some((x) => x.id === m.model) ? list : [{ id: m.model, free: false, vision: false }, ...list];
+  $('sModel').innerHTML = opts.slice(0, 600).map((x) => `<option value="${esc(x.id)}">${esc(modelLabel(x))}</option>`).join('');
+  $('sModel').value = m.model;
+  $('sModel').hidden = false;
+}
+async function setSessionModel(provider, model) {
+  await post('/api/session/model', { id: ST.activeId, provider, model });
+  await refresh();
+}
+$('sProv').onchange = async () => {
+  const pid = $('sProv').value;
+  if (!pid) return setSessionModel(null, null);
+  const list = await providerModels(pid);
+  const p = LLM.providers.find((x) => x.id === pid);
+  // Premier modèle gratuit de l'hébergeur, sinon son modèle par défaut.
+  const pick = list.find((x) => x.free)?.id ?? list[0]?.id ?? p.defaultModel;
+  setSessionModel(pid, pick);
+};
+$('sModel').onchange = () => setSessionModel($('sProv').value, $('sModel').value);
+
 let LLM = { chain: [], providers: [], cooldowns: {}, fallback: true };
 let MODELS = [];
 const pname = (id) => LLM.providers.find((p) => p.id === id)?.name ?? id;
@@ -857,6 +916,7 @@ const pname = (id) => LLM.providers.find((p) => p.id === id)?.name ?? id;
 async function loadLlm() {
   LLM = await (await fetch('/api/llm')).json();
   renderLlm();
+  syncSessionModel(true);
 }
 async function saveLlm(patch) {
   const r = await post('/api/llm', patch);
@@ -903,9 +963,7 @@ $('mBtnFallback').onclick = () => saveLlm({ fallback: !LLM.fallback });
 function renderModels() {
   const f = $('mFilter').value.toLowerCase(), free = $('mFree').checked, vision = $('mVision').checked;
   const list = MODELS.filter((m) => (!free || m.free) && (!vision || m.vision) && m.id.toLowerCase().includes(f));
-  // Chaque ligne de la liste déroulante indique ce que le modèle accepte en entrée.
-  const label = (m) => `[${m.vision ? 'texte + image' : 'texte seul'}]  ${m.id}${m.free ? '  -  gratuit' : ''}`;
-  $('mModel').innerHTML = list.slice(0, 500).map((m) => `<option value="${esc(m.id)}">${esc(label(m))}</option>`).join('');
+  $('mModel').innerHTML = list.slice(0, 500).map((m) => `<option value="${esc(m.id)}">${esc(modelLabel(m))}</option>`).join('');
   if (MODELS.length) $('mModelsMsg').textContent = `${list.length} modèle(s) affiché(s) sur ${MODELS.length}`;
 }
 async function loadModels() {

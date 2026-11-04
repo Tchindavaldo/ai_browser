@@ -168,6 +168,7 @@ export class Manager {
       browserLabel: this.hosts.get(s.hostId)?.label,
       headless: this.hosts.get(s.hostId)?.headless,
       busy: s.session.busy,
+      model: s.session.model,
       url: safeUrl(s.tab),
       createdAt: s.createdAt,
       ...s.stats

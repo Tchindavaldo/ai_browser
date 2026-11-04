@@ -110,8 +110,13 @@ async function callOne(entry, { messages, tools, temperature, signal }) {
 let lastUsed = null;
 
 /** Appel chat/completions compatible OpenAI, en suivant la chaîne de modèles. */
-export async function chat({ messages, tools, temperature = 0, signal }) {
-  const chain = settings.fallback ? settings.chain : settings.chain.slice(0, 1);
+export async function chat({ messages, tools, temperature = 0, signal, prefer }) {
+  // prefer : modèle choisi pour une session précise ; il passe en tête, la chaîne sert de secours.
+  let chain = settings.chain;
+  if (prefer?.provider && prefer?.model) {
+    chain = [prefer, ...chain.filter((e) => !(e.provider === prefer.provider && e.model === prefer.model))];
+  }
+  if (!settings.fallback) chain = chain.slice(0, 1);
   const now = Date.now();
   const ready = chain.filter((e) => (cooldown.get(`${e.provider}|${e.model}`) ?? 0) <= now);
   const errors = [];

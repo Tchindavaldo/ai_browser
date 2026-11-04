@@ -201,6 +201,19 @@ const server = http.createServer(async (req, res) => {
       return json(res, 200, { ok: true });
     }
 
+    // --- Modèle choisi pour une session (null = chaîne par défaut) ---
+    if (url.pathname === '/api/session/model' && req.method === 'POST') {
+      const body = await readBody(req);
+      const rec = manager.sessions.get(body.id ?? manager.activeId);
+      if (!rec) return json(res, 404, { error: 'session inconnue' });
+      if (body.provider && body.model) {
+        if (!provider(body.provider)) return json(res, 400, { error: 'fournisseur inconnu' });
+        rec.session.model = { provider: body.provider, model: String(body.model).trim() };
+      } else rec.session.model = null;
+      broadcast({ type: 'sessions', ...manager.state() });
+      return json(res, 200, { ok: true, model: rec.session.model });
+    }
+
     // --- Nouvel objectif ---
     if (url.pathname === '/api/message' && req.method === 'POST') {
       const body = await readBody(req);
