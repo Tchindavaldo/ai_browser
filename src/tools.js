@@ -83,6 +83,18 @@ export const TOOL_SCHEMAS = [
   }, ['success', 'result'])
 ];
 
+/**
+ * Essaie chaque méthode dans l'ordre et renvoie le nom de celle qui a marché.
+ * Si toutes échouent, l'erreur rapporte chaque tentative (le modèle sait ce qui a été essayé).
+ */
+async function tryInOrder(methods) {
+  const errs = [];
+  for (const [name, fn] of methods) {
+    try { await fn(); return name; } catch (e) { errs.push(`${name} : ${String(e.message).split('\n')[0]}`); }
+  }
+  throw new Error(`toutes les méthodes ont échoué. ${errs.join(' | ')}`);
+}
+
 export async function runTool(tab, name, args) {
   const page = tab.page;
   const browser = tab;
@@ -92,31 +104,56 @@ export async function runTool(tab, name, args) {
       return `Navigué vers ${page.url()}`;
 
     case 'click': {
-      const l = browser.loc(args.ref);
+      const l = await browser.locate(args.ref);
       await l.scrollIntoViewIfNeeded({ timeout: 2000 }).catch(() => {});
-      await l.click({ timeout: 4000 });
+      // Clic normal, sinon forcé (élément recouvert ou jugé « non cliquable »), sinon par le JavaScript de la page.
+      const how = await tryInOrder([
+        ['normal', () => l.click({ timeout: 4000 })],
+        ['JavaScript', () => l.evaluate((el) => el.click(), null, { timeout: 2000 })],
+        ['forcé', () => l.click({ timeout: 2000, force: true })]
+      ]);
       await page.waitForTimeout(500);
-      return `Clic sur [${args.ref}] effectué. URL: ${page.url()}`;
+      return `Clic sur [${args.ref}] effectué${how === 'normal' ? '' : ` (clic ${how}, le clic normal avait échoué)`}. URL: ${page.url()}`;
     }
 
     case 'type': {
-      const l = browser.loc(args.ref);
+      const l = await browser.locate(args.ref);
       await l.scrollIntoViewIfNeeded({ timeout: 2000 }).catch(() => {});
-      await l.fill('', { timeout: 4000 }).catch(() => {});
-      await l.fill(args.text, { timeout: 4000 });
-      if (args.submit) { await l.press('Enter'); await page.waitForTimeout(800); }
-      return `Saisi ${JSON.stringify(args.text)} dans [${args.ref}]${args.submit ? ' + Entrée' : ''}`;
+      // Saisie directe, sinon clic dans le champ puis frappe au clavier (champs masqués ou habillés).
+      const how = await tryInOrder([
+        ['normal', async () => { await l.fill('', { timeout: 4000 }).catch(() => {}); await l.fill(args.text, { timeout: 4000 }); }],
+        ['clavier', async () => {
+          await l.click({ timeout: 2000, force: true }).catch(() => l.evaluate((el) => el.focus(), null, { timeout: 2000 }));
+          await page.keyboard.press('ControlOrMeta+A');
+          await page.keyboard.press('Backspace');
+          await page.keyboard.type(args.text, { delay: 30 });
+        }]
+      ]);
+      if (args.submit) { await page.keyboard.press('Enter'); await page.waitForTimeout(800); }
+      return `Saisi ${JSON.stringify(args.text)} dans [${args.ref}]${how === 'normal' ? '' : ' (au clavier, la saisie directe avait échoué)'}${args.submit ? ' + Entrée' : ''}`;
     }
 
     case 'select':
-      await browser.loc(args.ref).selectOption({ label: args.value }, { timeout: 4000 }).catch(async () => {
-        await browser.loc(args.ref).selectOption(args.value, { timeout: 4000 });
+      await (await browser.locate(args.ref)).selectOption({ label: args.value }, { timeout: 4000 }).catch(async () => {
+        await (await browser.locate(args.ref)).selectOption(args.value, { timeout: 4000 });
       });
       return `Option ${JSON.stringify(args.value)} sélectionnée dans [${args.ref}]`;
 
-    case 'check':
-      await browser.loc(args.ref).setChecked(args.checked, { timeout: 4000 });
-      return `[${args.ref}] ${args.checked ? 'coché' : 'décoché'}`;
+    case 'check': {
+      const l = await browser.locate(args.ref);
+      // Case normale, sinon forcée (case cachée sous un dessin), sinon clic sur son libellé.
+      const how = await tryInOrder([
+        ['normal', () => l.setChecked(args.checked, { timeout: 4000 })],
+        ['forcé', () => l.setChecked(args.checked, { timeout: 2000, force: true })],
+        ['libellé', () => l.evaluate((el, want) => {
+          if (el.checked === want) return;
+          const lab = el.labels?.[0] ?? el.closest('label');
+          (lab ?? el).click();
+          if (el.checked !== undefined && el.checked !== want) throw new Error('état inchangé');
+        }, args.checked, { timeout: 2000 })]
+      ]);
+      return `[${args.ref}] ${args.checked ? 'coché' : 'décoché'}${how === 'normal' ? '' : ` (méthode : ${how})`}`;
+    }
 
     case 'press_key':
       await page.keyboard.press(args.key);
@@ -160,7 +197,8 @@ export async function runTool(tab, name, args) {
 
     case 'eval_js': {
       const r = await page.evaluate(new Function(args.code));
-      return JSON.stringify(r, null, 2).slice(0, 20000);
+      // Un script sans « return » renvoie undefined : ce n'est pas une erreur.
+      return r === undefined ? 'Script exécuté (aucune valeur renvoyée).' : String(JSON.stringify(r, null, 2)).slice(0, 20000);
     }
 
     default:

@@ -19,7 +19,17 @@ Règles :
   snapshot suivant que la soumission a réussi (message de confirmation, changement d'URL).
 - Pour du scraping : eval_js est souvent plus fiable et plus complet que lire le texte.
 - Ne devine pas de données personnelles : n'utilise que celles fournies dans l'objectif.
-- Quand l'objectif est atteint — ou définitivement impossible — appelle done avec le résultat.
+- Persévérance : une erreur n'est jamais une raison de t'arrêter. Après un échec, essaie une autre
+  méthode (autre élément, libellé, clavier, scroll, attente, eval_js). Ne déclare l'objectif
+  impossible qu'après au moins 3 méthodes vraiment différentes sur le même blocage, et dis
+  précisément lesquelles dans done.
+- Ne devine pas d'URL internes d'un parcours (inscription, paiement…) : y aller directement fait
+  souvent perdre la progression et renvoie à l'accueil. Avance avec les boutons de la page. Si tu
+  es renvoyé en arrière, reprends le parcours depuis là où tu es.
+- Si une action a réussi mais que la page ne change pas, vérifie d'abord ce qu'elle demande
+  (champ obligatoire vide, choix à faire, message d'erreur, case à cocher) avant de recommencer.
+- Quand l'objectif est atteint, ou impossible après ces essais, appelle done avec le résultat.
+  N'appelle done qu'à ce moment-là : ne t'arrête pas en cours de route pour rendre compte.
 - N'appelle qu'un seul outil à la fois.
 - Quand une action échoue, une capture de la page entière peut t'être jointe (si tu lis les images).
   Regarde-la pour comprendre la cause (fenêtre qui recouvre, élément dessiné autrement, message
@@ -87,7 +97,7 @@ export class Session {
           const u = msg.usedModel;
           this.usingModel = modelName(u);
           onEvent({ type: 'model', step, provider: u.provider, model: u.model, text: modelName(u) });
-          if (msg.imageDropped) onEvent({ type: 'result', step, name: 'capture', output: 'Capture non lue : ce modèle ne prend que du texte (bascule).' });
+          if (msg.imageDropped) onEvent({ type: 'shot', step, ok: false, text: 'Capture non lue : le modèle de secours ne prend que du texte.' });
         }
 
         // reasoning_content : chaîne de pensée des modèles « reasoner ».
@@ -140,19 +150,25 @@ export class Session {
         // Capture de la page : après un échec, sur demande (outil screenshot) ou à chaque étape si l'option est active.
         let shot = null;
         // Inutile de capturer si le modèle prévu ne lit pas les images.
-        if ((failed || wantShot || this.shotEveryStep) && await readsImages(plannedModel(this.model)).catch(() => false)) {
-          shot = await this.tab.pageShotForModel().catch(() => null);
+        const needShot = failed || wantShot || this.shotEveryStep;
+        if (needShot && await readsImages(plannedModel(this.model)).catch(() => false)) {
+          shot = await this.tab.pageShotForModel().catch((e) => {
+            onEvent({ type: 'shot', step, ok: false, text: `Capture impossible : ${String(e.message).slice(0, 160)}` });
+            return null;
+          });
         }
         stripOldImages(this.messages);
         if (shot) {
-          const why = failed ? `L'action ${failed} a échoué. Voici la page entière telle qu'elle est affichée.`
-            : 'Capture de la page entière telle qu\'elle est affichée.';
+          const area = shot.full ? 'la page entière' : 'la zone visible (page entière impossible)';
+          const why = failed ? `L'action ${failed} a échoué. Voici ${area} telle qu'elle est affichée.`
+            : `Capture de ${area} telle qu'elle est affichée.`;
           this.messages.push({ role: 'user', content: [
             { type: 'text', text: state },
             { type: 'text', text: why },
-            { type: 'image_url', image_url: { url: `data:image/jpeg;base64,${shot}` } }
+            { type: 'image_url', image_url: { url: `data:image/jpeg;base64,${shot.b64}` } }
           ] });
-          onEvent({ type: 'result', step, name: 'capture', output: failed ? 'Capture de la page envoyée au modèle après l\'échec.' : 'Capture de la page envoyée au modèle.' });
+          onEvent({ type: 'shot', step, ok: true, url: shot.url,
+            text: `${failed ? `Après l'échec de ${failed} : capture` : 'Capture'} de ${area} envoyée au modèle (${shot.kb} Ko)` });
         } else {
           this.messages.push({ role: 'user', content: state });
         }

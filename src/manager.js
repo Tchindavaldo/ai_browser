@@ -25,7 +25,7 @@ export class Manager {
     const e = { ...event, sessionId, ts: Date.now() };
     const s = this.sessions.get(sessionId);
 
-    if (s && ['title', 'model', 'thought', 'action', 'result', 'artifact', 'done', 'user', 'system'].includes(event.type)) {
+    if (s && ['title', 'model', 'shot', 'thought', 'action', 'result', 'artifact', 'done', 'user', 'system'].includes(event.type)) {
       s.events.push(e);
       if (s.events.length > 600) s.events.shift();
       this.#track(s, e);

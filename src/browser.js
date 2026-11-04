@@ -119,6 +119,27 @@ export class Tab {
 
   loc(ref) { return this.page.locator(`[data-rv-ref="${ref}"]`).first(); }
 
+  /**
+   * Comme loc(), mais si la page a redessiné l'élément depuis le dernier snapshot (la référence
+   * a disparu), on le retrouve par son type et son libellé, et on lui redonne sa référence.
+   */
+  async locate(ref) {
+    const l = this.loc(ref);
+    if (await l.count().catch(() => 0)) return l;
+    const want = this.lastElements?.get(Number(ref));
+    if (!want) return l;
+    await this.page.evaluate(({ ref, want, sel }) => {
+      const label = (el) => (
+        el.getAttribute('aria-label') || el.getAttribute('placeholder') || el.getAttribute('title') ||
+        el.getAttribute('name') || el.value || el.innerText || el.getAttribute('alt') || ''
+      ).replace(/\s+/g, ' ').trim().slice(0, 120);
+      const hit = [...document.querySelectorAll(sel)].find((el) =>
+        el.tagName.toLowerCase() === want.tag && label(el) === want.name);
+      if (hit) hit.setAttribute('data-rv-ref', String(ref));
+    }, { ref, want, sel: INTERACTIVE }).catch(() => {});
+    return l;
+  }
+
   async close() {
     this.host?.tabs.delete(this);
     await this.page?.close().catch(() => {});
@@ -195,6 +216,8 @@ export class Tab {
       return { url, title: '', error: String(err.message).slice(0, 300), elements: [], text: '', ...drain() };
     }
 
+    // Garde de quoi retrouver un élément si la page le redessine avant l'action.
+    this.lastElements = new Map(data.elements.map((e) => [e.ref, { tag: e.tag, name: e.name }]));
     return { url, ...data, ...drain() };
   }
 
@@ -210,11 +233,23 @@ export class Tab {
   async pageShotForModel(maxHeight = 6000) {
     const h = await this.page.evaluate(() => Math.max(document.documentElement.scrollHeight, document.body?.scrollHeight ?? 0)).catch(() => 0);
     const vp = this.page.viewportSize() ?? { width: 1280, height: 800 };
-    const opts = { type: 'jpeg', quality: 55, timeout: 8000 };
+    // animations: 'disabled' et caret masqué : évite d'attendre une page qui bouge sans cesse.
+    const opts = { type: 'jpeg', quality: 55, timeout: 8000, animations: 'disabled', caret: 'hide' };
     if (h > maxHeight) Object.assign(opts, { fullPage: true, clip: { x: 0, y: 0, width: vp.width, height: maxHeight } });
     else opts.fullPage = true;
-    const buf = await this.page.screenshot(opts);
-    return buf.toString('base64');
+    let buf, full = true;
+    try {
+      buf = await this.page.screenshot(opts);
+    } catch {
+      // Page entière impossible (trop lourde, polices qui ne finissent pas de charger) : zone visible.
+      buf = await this.page.screenshot({ type: 'jpeg', quality: 55, timeout: 5000, animations: 'disabled', caret: 'hide' });
+      full = false;
+    }
+    // Copie sur disque pour l'afficher dans « Activité de l'agent ».
+    await fs.mkdir(CAPTURES, { recursive: true });
+    const name = `${new Date().toISOString().replace(/[:.]/g, '-')}_modele.jpg`;
+    await fs.writeFile(path.join(CAPTURES, name), buf);
+    return { b64: buf.toString('base64'), url: `/captures/${name}`, full, kb: Math.round(buf.length / 1024) };
   }
 
   /**
