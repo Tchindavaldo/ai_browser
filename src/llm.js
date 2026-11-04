@@ -102,6 +102,8 @@ async function callOne(entry, { messages, tools, temperature, signal }) {
     : messages;
   const body = { model: entry.model, messages: msgs, temperature };
   if (tools?.length) Object.assign(body, { tools, tool_choice: 'auto' });
+  // OpenRouter : coût réel de l'appel renvoyé dans usage.cost.
+  if (p.id === 'openrouter') body.usage = { include: true };
 
   let lastErr;
   // Une seule relance, et seulement pour une coupure réseau ou une erreur 500 isolée.
@@ -127,6 +129,8 @@ async function callOne(entry, { messages, tools, temperature, signal }) {
       const json = await res.json();
       const msg = json.choices?.[0]?.message;
       if (!msg) throw new Error(`Réponse vide : ${JSON.stringify(json).slice(0, 200)}`);
+      // Jetons consommés, invisibles dans le JSON renvoyé aux API.
+      Object.defineProperty(msg, 'usage', { value: json.usage ?? null, enumerable: false });
       return msg;
     }
     const text = (await res.text()).slice(0, 400);

@@ -1,6 +1,7 @@
 import { BrowserHost, renderSnapshot } from './browser.js';
 import { TOOL_SCHEMAS, runTool } from './tools.js';
 import { chat, modelName, visionAvailable } from './llm.js';
+import { usageCost } from './cost.js';
 
 const SYSTEM = `Tu es Rauvalia, un agent qui pilote un vrai navigateur web pour accomplir un objectif.
 
@@ -83,6 +84,9 @@ export class Session {
     this.busy = true;
     this.cancelled = false;
     this.ac = new AbortController();
+    // Total des jetons et du coût de cette demande.
+    const total = { input: 0, output: 0, usd: 0, cfa: 0, unknown: false };
+    const withTotal = (res) => ({ ...res, usage: { ...total } });
 
     try {
       this.messages.push({ role: 'user', content: `OBJECTIF:\n${objective}` });
@@ -100,6 +104,12 @@ export class Session {
           const u = msg.usedModel;
           this.usingModel = modelName(u);
           onEvent({ type: 'model', step, provider: u.provider, model: u.model, text: modelName(u) });
+          const c = await usageCost(u, msg.usage).catch(() => null);
+          if (c) {
+            total.input += c.input; total.output += c.output;
+            if (c.usd === null) total.unknown = true; else { total.usd += c.usd; total.cfa += c.cfa; }
+            onEvent({ type: 'usage', step, ...c });
+          }
           if (msg.imageDropped) onEvent({ type: 'shot', step, ok: false, text: 'Capture non lue : aucun modèle lisant les images n’a répondu, un modèle texte seul a pris le relais.' });
         }
 
@@ -128,7 +138,7 @@ export class Session {
           onEvent({ type: 'action', step, name, args: params });
 
           if (name === 'done') {
-            const res = { success: !!params.success, result: params.result ?? '', steps: step };
+            const res = withTotal({ success: !!params.success, result: params.result ?? '', steps: step });
             this.messages.push({ role: 'tool', tool_call_id: call.id, content: 'Tâche terminée.' });
             onEvent({ type: 'done', step, ...res });
             return res;
@@ -183,14 +193,14 @@ export class Session {
         trimHistory(this.messages);
       }
 
-      const res = { success: false, result: `Limite de ${maxSteps} étapes atteinte.`, steps: maxSteps };
+      const res = withTotal({ success: false, result: `Limite de ${maxSteps} étapes atteinte.`, steps: maxSteps });
       onEvent({ type: 'done', ...res });
       return res;
     } catch (e) {
       if (this.cancelled || e.name === 'Cancelled' || e.name === 'AbortError') {
         // L'historique reste cohérent : on note l'interruption pour la suite.
         this.messages.push({ role: 'user', content: '(tâche interrompue par l’utilisateur)' });
-        const res = { success: false, result: 'Tâche coupée.', cancelled: true };
+        const res = withTotal({ success: false, result: 'Tâche coupée.', cancelled: true });
         onEvent({ type: 'done', ...res });
         return res;
       }
