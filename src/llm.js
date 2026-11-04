@@ -18,9 +18,24 @@ const FILE = process.env.RAUVALIA_SETTINGS || path.join(ROOT, 'llm-settings.json
 const COOLDOWN_MS = 10 * 60 * 1000;
 // Temps maximum d'attente d'une réponse du modèle (au-delà, on passe au modèle suivant).
 const CALL_TIMEOUT_MS = 20 * 1000;
-// Pause d'un modèle qui renvoie une erreur de requête (400, 404...) : il ne marchera pas mieux tout de suite.
-const BROKEN_MS = 30 * 60 * 1000;
+// Pause d'un modèle qui renvoie une erreur de requête (400, 404...) : il ne marchera pas mieux de la journée.
+const BROKEN_MS = 24 * 60 * 60 * 1000;
+// Pause d'un modèle trop lent (pas de réponse à temps) ou surchargé (503) : il sera réessayé plus tard.
+const SLOW_MS = 5 * 60 * 1000;
+
+// Pauses gardées sur disque, à côté des réglages (volume /data sur Fly) : elles survivent aux redémarrages.
+const PAUSE_FILE = path.join(path.dirname(FILE), 'llm-pauses.json');
 const cooldown = new Map(); // "fournisseur|modèle" -> fin de pause (ms)
+try {
+  for (const [k, t] of Object.entries(JSON.parse(fs.readFileSync(PAUSE_FILE, 'utf8')))) if (t > Date.now()) cooldown.set(k, t);
+} catch { /* pas encore de fichier */ }
+function pause(entry, ms) {
+  cooldown.set(`${entry.provider}|${entry.model}`, Date.now() + ms);
+  const now = Date.now();
+  try {
+    fs.writeFileSync(PAUSE_FILE, JSON.stringify(Object.fromEntries([...cooldown].filter(([, t]) => t > now)), null, 1));
+  } catch { /* disque en lecture seule : les pauses restent en mémoire */ }
+}
 
 function load() {
   let s = {};
@@ -60,7 +75,7 @@ export function updateSettings({ chain, fallback, keys }) {
       if (!provider(e?.provider) || !String(e?.model ?? '').trim()) throw new Error('Modèle invalide.');
     }
     settings.chain = chain.map((e) => ({ provider: e.provider, model: String(e.model).trim() }));
-    cooldown.clear();
+    // Les pauses sont par modèle : on les garde même si la liste change.
   }
   if (fallback !== undefined) settings.fallback = !!fallback;
   for (const [id, k] of Object.entries(keys ?? {})) {
@@ -89,8 +104,9 @@ async function callOne(entry, { messages, tools, temperature, signal }) {
   if (tools?.length) Object.assign(body, { tools, tool_choice: 'auto' });
 
   let lastErr;
-  for (let attempt = 0; attempt < 3; attempt++) {
-    if (attempt) await new Promise((r) => setTimeout(r, 1000 * 2 ** attempt));
+  // Une seule relance, et seulement pour une coupure réseau ou une erreur 500 isolée.
+  for (let attempt = 0; attempt < 2; attempt++) {
+    if (attempt) await new Promise((r) => setTimeout(r, 1000));
     let res;
     // Limite de temps : un modèle qui ne répond pas ne doit pas bloquer l'agent indéfiniment.
     const limit = AbortSignal.timeout(CALL_TIMEOUT_MS);
@@ -102,6 +118,7 @@ async function callOne(entry, { messages, tools, temperature, signal }) {
     } catch (e) {
       if (e.name === 'AbortError' && signal?.aborted) throw e;
       if (e.name === 'TimeoutError' || limit.aborted) {
+        pause(entry, SLOW_MS);
         throw new Error(`${p.name} n'a pas répondu en ${CALL_TIMEOUT_MS / 1000} s`);
       }
       lastErr = e; continue;
@@ -115,15 +132,21 @@ async function callOne(entry, { messages, tools, temperature, signal }) {
     const text = (await res.text()).slice(0, 400);
     // Quota épuisé ou limite atteinte : inutile d'insister, on passe au suivant.
     if (res.status === 402 || res.status === 429 || /quota|rate.?limit|credit/i.test(text)) {
-      cooldown.set(`${entry.provider}|${entry.model}`, Date.now() + COOLDOWN_MS);
+      pause(entry, COOLDOWN_MS);
       throw new Error(`${p.name} épuisé (${res.status}) : ${text}`);
     }
-    if (res.status >= 500) { lastErr = new Error(`${p.name} ${res.status} : ${text}`); continue; }
+    // Surchargé (503) : inutile d'insister maintenant, pause courte. Autre 500 : une relance, puis pause.
+    if (res.status >= 500) {
+      lastErr = new Error(`${p.name} ${res.status} : ${text}`);
+      if (res.status === 503 || attempt) { pause(entry, SLOW_MS); throw lastErr; }
+      continue;
+    }
     // Modèle inutilisable ici (n'existe pas, refuse les outils, mauvais format) : mis en pause aussi,
     // pour ne pas le réessayer à chaque étape.
-    if ([400, 403, 404, 422].includes(res.status)) cooldown.set(`${entry.provider}|${entry.model}`, Date.now() + BROKEN_MS);
+    if ([400, 403, 404, 422].includes(res.status)) pause(entry, BROKEN_MS);
     throw new Error(`${p.name} ${res.status} : ${text}`);
   }
+  pause(entry, SLOW_MS);
   throw lastErr;
 }
 

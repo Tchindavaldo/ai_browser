@@ -4,3 +4,4 @@ captures/
 *.log
 llm-settings.json
 fly-secrets.env
+llm-pauses.json
