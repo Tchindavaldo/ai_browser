@@ -1,6 +1,6 @@
 import { BrowserHost, renderSnapshot } from './browser.js';
 import { TOOL_SCHEMAS, runTool } from './tools.js';
-import { chat, modelName, readsImages, plannedModel } from './llm.js';
+import { chat, modelName, visionAvailable } from './llm.js';
 
 const SYSTEM = `Tu es Rauvalia, un agent qui pilote un vrai navigateur web pour accomplir un objectif.
 
@@ -100,7 +100,7 @@ export class Session {
           const u = msg.usedModel;
           this.usingModel = modelName(u);
           onEvent({ type: 'model', step, provider: u.provider, model: u.model, text: modelName(u) });
-          if (msg.imageDropped) onEvent({ type: 'shot', step, ok: false, text: 'Capture non lue : le modèle de secours ne prend que du texte.' });
+          if (msg.imageDropped) onEvent({ type: 'shot', step, ok: false, text: 'Capture non lue : aucun modèle lisant les images n’a répondu, un modèle texte seul a pris le relais.' });
         }
 
         // reasoning_content : chaîne de pensée des modèles « reasoner ».
@@ -157,7 +157,7 @@ export class Session {
         let shot = null;
         // Inutile de capturer si le modèle prévu ne lit pas les images.
         const needShot = failed || wantShot || this.shotEveryStep;
-        if (needShot && await readsImages(plannedModel(this.model)).catch(() => false)) {
+        if (needShot && await visionAvailable(this.model).catch(() => false)) {
           shot = await this.tab.pageShotForModel().catch((e) => {
             onEvent({ type: 'shot', step, ok: false, text: `Capture impossible : ${String(e.message).slice(0, 160)}` });
             return null;

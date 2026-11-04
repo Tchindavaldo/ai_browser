@@ -152,6 +152,17 @@ function textOnly(messages) {
 let lastUsed = null;
 
 /** Modèle qui sera essayé en premier (celui de la session, sinon le premier de la chaîne disponible). */
+/** Y a-t-il un modèle disponible (session ou liste) qui lit les images ? Sinon, inutile de capturer. */
+export async function visionAvailable(prefer) {
+  const now = Date.now();
+  const list = [...(prefer?.provider && prefer?.model ? [prefer] : []), ...(settings.fallback ? settings.chain : settings.chain.slice(0, 1))];
+  for (const e of list) {
+    if ((cooldown.get(`${e.provider}|${e.model}`) ?? 0) > now) continue;
+    if (await readsImages(e).catch(() => false)) return true;
+  }
+  return false;
+}
+
 export function plannedModel(prefer) {
   if (prefer?.provider && prefer?.model) return prefer;
   const now = Date.now();
@@ -171,10 +182,19 @@ export async function chat({ messages, tools, temperature = 0, signal, prefer })
   if (!settings.fallback) chain = chain.slice(0, 1);
   const now = Date.now();
   const ready = chain.filter((e) => (cooldown.get(`${e.provider}|${e.model}`) ?? 0) <= now);
+  let order = ready.length ? ready : chain;
+  const hasImage = messages.some((m) => Array.isArray(m.content));
+  if (hasImage) {
+    // Étape avec capture : d'abord les modèles qui lisent les images (dans l'ordre de la liste),
+    // les modèles texte seul ne servent qu'en dernier recours. À l'étape suivante sans capture,
+    // l'ordre normal reprend.
+    const vision = [], text = [];
+    for (const e of order) (await readsImages(e).catch(() => false) ? vision : text).push(e);
+    order = [...vision, ...text];
+  }
   const errors = [];
-  for (const entry of ready.length ? ready : chain) {
+  for (const entry of order) {
     try {
-      const hasImage = messages.some((m) => Array.isArray(m.content));
       const msgs = hasImage && !(await readsImages(entry)) ? textOnly(messages) : messages;
       const msg = await callOne(entry, { messages: msgs, tools, temperature, signal });
       lastUsed = entry;
