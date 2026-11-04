@@ -2,7 +2,6 @@
 
 Navigateur piloté par IA : Node.js + Playwright, l'IA prend toutes les décisions.
 Ex `rauvalia-web`, déplacé ici. Dépôt GitHub : `Tchindavaldo/ai_browser`.
-L'ancienne version Python est sur la branche `legacy-python`.
 
 - Serveur et interface : `npm run serve` (port 7331), page `public/index.html`.
 - Accès à distance au visuel : tunnel Cloudflare, `npm run tunnel` (`src/tunnel.js`).

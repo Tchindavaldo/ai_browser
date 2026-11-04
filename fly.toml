@@ -1,0 +1,26 @@
+# Déploiement Fly.io. Le nom de l'application est à choisir au premier « fly launch ».
+app = "ai-browser"
+primary_region = "cdg"
+
+[build]
+
+[env]
+  RAUVALIA_HOST = "0.0.0.0"
+  RAUVALIA_PORT = "8080"
+  RAUVALIA_SETTINGS = "/data/llm-settings.json"
+
+[http_service]
+  internal_port = 8080
+  force_https = true
+  auto_stop_machines = "stop"
+  auto_start_machines = true
+  min_machines_running = 0
+
+# Disque permanent : garde les réglages des modèles IA entre deux redémarrages.
+[mounts]
+  source = "ai_browser_data"
+  destination = "/data"
+
+[[vm]]
+  memory = "2gb"
+  cpus = 1

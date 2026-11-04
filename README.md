@@ -257,3 +257,17 @@ Outils disponibles pour l'IA : `navigate`, `click`, `type`, `select`, `check`,
 `press_key`, `scroll`, `wait`, `go_back`, `read_page`, `eval_js`, `done`.
 
 Les refs `[n]` sont réattribués à chaque snapshot — le prompt système l'impose à l'IA.
+
+## Déploiement sur Fly.io
+
+Le dépôt contient `Dockerfile` et `fly.toml`.
+
+1. Sur fly.io : « Launch an app » depuis le dépôt GitHub (ou `fly launch` dans ce dossier).
+2. Ajouter les secrets (onglet Secrets ou `fly secrets set`) :
+   - `RAUVALIA_TOKEN` : jeton d'accès à l'interface (obligatoire, l'application est publique) ;
+   - les clés des modèles IA (`DEEPSEEK_API_KEY`, `OPENROUTER_API_KEY`, `GROQ_API_KEY`...),
+     ou les saisir ensuite dans la vue « Modèles IA ».
+3. Déployer. Ouvrir `https://<nom-app>.fly.dev/?token=<jeton>`.
+
+Sur le serveur il n'y a pas d'écran : utiliser « Sans fenêtre » ; la vue live fonctionne.
+Le volume `/data` garde les réglages des modèles IA.

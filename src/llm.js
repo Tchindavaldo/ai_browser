@@ -11,7 +11,8 @@ import { PROVIDERS, provider } from './providers.js';
  * d'environnement (DEEPSEEK_API_KEY, OPENROUTER_API_KEY, GROQ_API_KEY...).
  */
 const ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
-const FILE = path.join(ROOT, 'llm-settings.json');
+// RAUVALIA_SETTINGS : autre emplacement (ex. volume Fly /data/llm-settings.json).
+const FILE = process.env.RAUVALIA_SETTINGS || path.join(ROOT, 'llm-settings.json');
 
 // Un modèle en quota épuisé ou limité est sauté pendant ce délai.
 const COOLDOWN_MS = 10 * 60 * 1000;
