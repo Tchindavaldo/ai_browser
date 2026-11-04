@@ -110,7 +110,7 @@ async function callOne(entry, { messages, tools, temperature, signal }) {
 
 // Le modèle lit-il les images ? D'après la liste de l'hébergeur (gardée 1 h), sinon d'après son nom.
 const VISION = new Map(); // fournisseur -> { at, ids: Map(id -> vision) }
-async function readsImages(entry) {
+export async function readsImages(entry) {
   const p = provider(entry.provider);
   let c = VISION.get(p.id);
   if (!c || Date.now() - c.at > 3600_000) {
@@ -132,6 +132,13 @@ function textOnly(messages) {
 
 let lastUsed = null;
 
+/** Modèle qui sera essayé en premier (celui de la session, sinon le premier de la chaîne disponible). */
+export function plannedModel(prefer) {
+  if (prefer?.provider && prefer?.model) return prefer;
+  const now = Date.now();
+  return settings.chain.find((e) => (cooldown.get(`${e.provider}|${e.model}`) ?? 0) <= now) ?? settings.chain[0];
+}
+
 /** Appel chat/completions compatible OpenAI, en suivant la chaîne de modèles. */
 export async function chat({ messages, tools, temperature = 0, signal, prefer }) {
   // prefer : modèle choisi pour une session précise ; il passe en tête, la chaîne sert de secours.
@@ -151,6 +158,8 @@ export async function chat({ messages, tools, temperature = 0, signal, prefer })
       lastUsed = entry;
       // Modèle qui a répondu, invisible dans le JSON renvoyé aux API.
       Object.defineProperty(msg, 'usedModel', { value: entry, enumerable: false });
+      // true : une capture était jointe mais ce modèle (texte seul) ne l'a pas reçue.
+      Object.defineProperty(msg, 'imageDropped', { value: hasImage && msgs !== messages, enumerable: false });
       return msg;
     } catch (e) {
       if (e.name === 'AbortError') throw e;
