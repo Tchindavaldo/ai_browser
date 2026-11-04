@@ -297,9 +297,10 @@ server.listen(PORT, HOST, () => {
   const base = `http://${HOST === '0.0.0.0' ? 'localhost' : HOST}:${PORT}`;
   // Le jeton s'applique aussi en local : cloudflared se connecte via 127.0.0.1,
   // exempter la boucle locale reviendrait à ouvrir le tunnel à tout le monde.
-  const q = TOKEN ? `/?token=${encodeURIComponent(TOKEN)}` : '';
-  console.log(`\n  Rauvalia   → ${base}${q}`);
-  console.log(`  API docs   → ${base}/docs${TOKEN ? `?token=${encodeURIComponent(TOKEN)}` : ''}`);
+  // Jeton masqué : les logs (Fly ou autres) ne doivent pas suffire pour entrer. Valeur complète dans .env.
+  const masked = TOKEN ? `?token=${TOKEN.slice(0, 4)}... (valeur complète : RAUVALIA_TOKEN)` : '';
+  console.log(`\n  Rauvalia   → ${base}/${masked}`);
+  console.log(`  API docs   → ${base}/docs${masked}`);
   console.log(`  Écoute sur ${HOST}:${PORT}${TOKEN ? '  · jeton requis' : '  · sans authentification'}`);
   if (HOST === '0.0.0.0' && !TOKEN) {
     console.log('  ATTENTION : Serveur exposé SANS jeton. Définis RAUVALIA_TOKEN avant de l’ouvrir vers l’extérieur.');
