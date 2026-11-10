@@ -585,6 +585,9 @@ form textarea { flex: 1; resize: none; max-height: 140px; padding: 9px 12px; bor
           <label class="sshots" title="Si le modèle lit les images, il reçoit une capture de la page entière à chaque étape (sinon seulement après une erreur)">
             <input type="checkbox" id="sShots"> Capture à chaque étape
           </label>
+          <label class="sshots" title="Range aussi ces captures dans le panneau Captures de la conversation (dossier « Chaque étape »). Possible seulement si « Capture à chaque étape » est cochée.">
+            <input type="checkbox" id="sSave"> Enregistrer chaque étape
+          </label>
         </div>
         <form id="form">
           <textarea id="input" rows="2" placeholder="Décris l'objectif — l'agent navigue, scrape et remplit les formulaires lui-même"></textarea>
@@ -786,6 +789,11 @@ function stepEl(n, ts) {
 function apply(ev) {
   const brain = $('brain');
   if (ev.type === 'user') { runStart = ev.ts ?? Date.now(); return void say('me', esc(ev.text)); }
+  if (ev.type === 'shot' && ev.ok && ev.url && ev.keep) {
+    // Option « Capture à chaque étape » : la capture est aussi rangée dans le panneau Captures.
+    sessCaps.push({ name: `Étape ${ev.step ?? ''} · ${ev.url.split('/').pop()}`, folder: 'Chaque étape', url: ev.url, ts: ev.ts });
+    renderCaps();
+  }
   if (ev.type === 'shot') {
     // Capture de la page envoyée au modèle (ou impossible) : visible dans l'étape, cliquable.
     stepEl(ev.step, ev.ts).insertAdjacentHTML('beforeend', ev.ok && ev.url
@@ -1087,6 +1095,8 @@ async function syncSessionModel(force) {
     + `</optgroup>`;
   $('sProv').disabled = $('sModel').disabled = $('sShots').disabled = !a;
   $('sShots').checked = !!a?.shots;
+  $('sSave').checked = !!a?.saveShots;
+  $('sSave').disabled = !a || !a.shots;
   const ci = m ? LLM.chain.findIndex((e) => e.provider === m.provider && e.model === m.model) : -1;
   if (!m || (ci >= 0 && !SM_FULL)) {
     $('sProv').value = m ? `chain:${ci}` : '';
@@ -1121,6 +1131,10 @@ $('sProv').onchange = async () => {
 };
 $('sShots').onchange = async () => {
   await post('/api/session/shots', { id: ST.activeId, on: $('sShots').checked });
+  await refresh();
+};
+$('sSave').onchange = async () => {
+  await post('/api/session/shots', { id: ST.activeId, save: $('sSave').checked });
   await refresh();
 };
 $('sModel').onchange = () => setSessionModel($('sProv').value, $('sModel').value);

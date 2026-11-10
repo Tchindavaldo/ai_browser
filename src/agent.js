@@ -56,6 +56,7 @@ export class Session {
     this.tab = tab;
     this.model = null; // { provider, model } choisi pour cette session, sinon la chaîne par défaut
     this.shotEveryStep = false; // true : capture de la page envoyée au modèle à chaque étape
+    this.saveEveryStep = false; // true (avec shotEveryStep) : ces captures sont aussi rangées dans le panneau Captures
     this.maxSteps = maxSteps;
     this.messages = [{ role: 'system', content: SYSTEM }];
     this.busy = false;
@@ -194,7 +195,8 @@ export class Session {
             { type: 'text', text: why },
             { type: 'image_url', image_url: { url: `data:image/jpeg;base64,${shot.b64}` } }
           ] });
-          onEvent({ type: 'shot', step, ok: true, url: shot.url,
+          // keep : option « Enregistrer chaque étape » (dépend de « Capture à chaque étape ») : rangée dans le panneau Captures.
+          onEvent({ type: 'shot', step, ok: true, url: shot.url, keep: this.shotEveryStep && this.saveEveryStep,
             text: `${failed ? `Après l'échec de ${failed} : capture` : 'Capture'} de ${area} envoyée au modèle (${shot.kb} Ko)` });
         } else {
           this.messages.push({ role: 'user', content: state });

@@ -170,6 +170,7 @@ export class Manager {
       busy: s.session.busy,
       model: s.session.model,
       shots: !!s.session.shotEveryStep,
+      saveShots: !!(s.session.shotEveryStep && s.session.saveEveryStep),
       using: s.session.usingModel ?? null,
       url: safeUrl(s.tab),
       createdAt: s.createdAt,

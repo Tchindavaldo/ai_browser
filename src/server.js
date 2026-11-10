@@ -210,9 +210,12 @@ const server = http.createServer(async (req, res) => {
       const body = await readBody(req);
       const rec = manager.sessions.get(body.id ?? manager.activeId);
       if (!rec) return json(res, 404, { error: 'session inconnue' });
-      rec.session.shotEveryStep = !!body.on;
+      if (body.on !== undefined) rec.session.shotEveryStep = !!body.on;
+      if (body.save !== undefined) rec.session.saveEveryStep = !!body.save;
+      // « Enregistrer chaque étape » n'a de sens qu'avec « Capture à chaque étape ».
+      if (!rec.session.shotEveryStep) rec.session.saveEveryStep = false;
       broadcast({ type: 'sessions', ...manager.state() });
-      return json(res, 200, { ok: true, shots: rec.session.shotEveryStep });
+      return json(res, 200, { ok: true, shots: rec.session.shotEveryStep, save: rec.session.saveEveryStep });
     }
     if (url.pathname === '/api/session/model' && req.method === 'POST') {
       const body = await readBody(req);
