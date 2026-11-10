@@ -155,11 +155,6 @@ INSTRUCTIONS DÉTAILLÉES :
 
 10. Peu importe les erreurs rencontrées : lis toujours le contenu de la page pour
     savoir où tu es et ce qu'il faut faire, continue, et va le plus loin possible.
-
-11. Dès que tu as cliqué sur « Activer mon abonnement », prends une capture avec
-    l'outil screenshot à chaque nouvelle étape, avec dossier = "netflix/tache-1"
-    et un label qui nomme l'étape (ex. "paiement-valide", "profils", "accueil").
-    La dernière capture est celle de l'accueil de Netflix.
 ```
 
 Après un done pour un code, il suffit d'envoyer le code dans la même session : la
