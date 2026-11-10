@@ -11,7 +11,8 @@
     "start": "node --env-file-if-exists=.env src/cli.js",
     "serve": "node --env-file-if-exists=.env src/server.js",
     "tunnel": "node --env-file-if-exists=.env src/tunnel.js",
-    "postinstall": "playwright install firefox chromium webkit"
+    "postinstall": "playwright install firefox chromium webkit",
+    "proxy": "node --env-file-if-exists=.env src/proxy.js"
   },
   "dependencies": {
     "playwright": "^1.49.0",

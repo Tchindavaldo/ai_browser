@@ -24,6 +24,18 @@ jobs:
       - uses: actions/checkout@v4
       - uses: superfly/flyctl-actions/setup-flyctl@master
 
+      # Clé Tailscale (secret GitHub TAILSCALE_AUTHKEY, facultatif) transmise à Fly avant le déploiement.
+      - name: Clé Tailscale (si présente)
+        if: ${{ inputs.deploy }}
+        env:
+          TAILSCALE_AUTHKEY: ${{ secrets.TAILSCALE_AUTHKEY }}
+        run: |
+          if [ -n "$TAILSCALE_AUTHKEY" ]; then
+            flyctl secrets set TAILSCALE_AUTHKEY="$TAILSCALE_AUTHKEY" -a "$FLY_APP" --stage
+          else
+            echo "Pas de secret TAILSCALE_AUTHKEY : Tailscale ne sera pas lancé."
+          fi
+
       - name: Déployer (optionnel)
         if: ${{ inputs.deploy }}
         run: flyctl deploy --remote-only -a "$FLY_APP"

@@ -98,7 +98,7 @@ export class Manager {
     };
     this.sessions.set(id, rec);
     this.activeId = id;
-    this.#emit(id, { type: 'system', text: `Nouvel onglet dans ${entry.label}.` });
+    this.#emit(id, { type: 'system', text: `Nouvel onglet dans ${entry.label}.${entry.host.via ? ` Connexion par le proxy « ${entry.host.via} ».` : ''}` });
     return rec;
   }
 

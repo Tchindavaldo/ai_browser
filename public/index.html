@@ -527,27 +527,34 @@ form textarea { flex: 1; resize: none; max-height: 140px; padding: 9px 12px; bor
   <div class="view" id="net">
     <div class="sec-title">Connexion du navigateur de l'agent</div>
     <div class="mcard">
-      <div class="nstate" id="nState"></div>
-      <p class="mnote">Sans proxy, les sites voient l'adresse du serveur. Avec un proxy, ils voient celle du proxy (par exemple une adresse au Cameroun). Le réglage s'applique aux navigateurs ouverts ensuite : créer une nouvelle session après l'avoir changé.</p>
+      <div id="nState"></div>
+      <div id="nList"></div>
+      <p class="mnote">Sans proxy, les sites voient l'adresse du serveur. Avec des proxys (téléphones, PC, fournisseur...), ils voient celle du proxy utilisé. Le premier de la liste qui répond est utilisé ; s'il est éteint ou injoignable, on passe au suivant. S'applique aux navigateurs ouverts ensuite : créer une nouvelle session après un changement.</p>
     </div>
     <div class="mact">
-      <button class="btn primary" id="nBtnEdit">Régler le proxy</button>
+      <button class="btn primary" id="nBtnAdd">Ajouter un proxy</button>
       <button class="btn" id="nBtnTest">Tester</button>
       <button class="btn" id="nBtnToggle"></button>
+      <button class="btn" id="nBtnTz">Fuseau horaire</button>
     </div>
-    <div class="mcard mpanel" id="nEdit" hidden>
+    <div class="mcard mpanel" id="nAdd" hidden>
       <div class="mform">
-        <input id="nServer" class="grow" placeholder="Adresse du proxy, ex. http://102.244.78.61:8089 ou socks5://hote:1080">
+        <input id="nName" placeholder="Nom, ex. Téléphone MTN">
+        <input id="nServer" class="grow" placeholder="Adresse, ex. http://100.64.1.2:8080 ou socks5://hote:1080">
       </div>
       <div class="mform" style="margin-top:8px">
         <input id="nUser" class="grow" placeholder="Identifiant (si le proxy en demande un)">
-        <input id="nPass" class="grow" type="password" placeholder="Mot de passe (vide = inchangé, - pour effacer)">
-      </div>
-      <div class="mform" style="margin-top:8px">
-        <input id="nTz" class="grow" placeholder="Fuseau horaire, ex. Africa/Douala">
-        <button class="btn primary" id="nSave">Enregistrer</button>
+        <input id="nPass" class="grow" type="password" placeholder="Mot de passe (si le proxy en demande un)">
+        <button class="btn primary" id="nAddOk">Ajouter</button>
       </div>
       <p class="mnote" id="nMsg"></p>
+    </div>
+    <div class="mcard mpanel" id="nTzPanel" hidden>
+      <div class="mform">
+        <input id="nTz" class="grow" placeholder="Fuseau horaire, ex. Africa/Douala (vide = celui du serveur)">
+        <button class="btn primary" id="nTzSave">Enregistrer</button>
+      </div>
+      <p class="mnote" id="nTzMsg"></p>
     </div>
     <div class="mcard mpanel" id="nTest" hidden><pre class="tres" id="nTestOut"></pre></div>
   </div>
@@ -1108,24 +1115,68 @@ let LLM = { chain: [], providers: [], cooldowns: {}, fallback: true };
 let MODELS = [];
 const pname = (id) => LLM.providers.find((p) => p.id === id)?.name ?? id;
 
-/* ================= connexion (proxy) ================= */
+/* ================= connexion (proxys, bascule automatique) ================= */
 let NET = null;
 async function loadNet() {
   try { NET = await (await fetch('/api/net')).json(); } catch { return; }
-  const on = NET.enabled && NET.server;
+  const on = NET.enabled && NET.proxies.length;
   $('nState').innerHTML = on
-    ? `<b>Proxy actif</b> : ${esc(NET.server)}${NET.username ? ` (identifiant ${esc(NET.username)})` : ''}<br>Fuseau horaire : ${esc(NET.timezone || 'celui du serveur')}`
-    : `<b>Sans proxy</b> : connexion directe depuis le serveur.${NET.server ? `<br>Proxy enregistré mais désactivé : ${esc(NET.server)}` : ''}`;
-  $('nBtnToggle').textContent = on ? 'Désactiver le proxy' : 'Activer le proxy';
-  $('nBtnToggle').disabled = !NET.server;
-  $('tNet').textContent = on ? 'Proxy' : 'Directe';
-  $('hNet').textContent = on ? NET.server.replace(/^\w+:\/\//, '') : 'cliquer pour régler';
+    ? `<b>Proxys actifs</b>, dans cet ordre. Fuseau horaire : ${esc(NET.timezone || 'celui du serveur')}${NET.lastUsed ? `<br>Dernier utilisé : ${esc(NET.lastUsed.name)}${NET.lastUsed.skipped?.length ? ` (injoignables avant lui : ${esc(NET.lastUsed.skipped.join(', '))})` : ''}` : ''}`
+    : `<b>Sans proxy</b> : connexion directe depuis le serveur.${NET.proxies.length ? ' Proxys enregistrés mais désactivés.' : ''}`;
+  $('nList').innerHTML = NET.proxies.map((p, i) => `
+    <div class="mrow" style="display:flex;gap:8px;align-items:center;padding:7px 0;border-top:1px solid var(--line-soft)">
+      <span style="color:var(--faint);width:18px">${i + 1}</span>
+      <b style="min-width:140px">${esc(p.name)}</b>
+      <span class="mnote" style="margin:0;flex:1">${esc(p.server)}${p.username ? ` · identifiant ${esc(p.username)}` : ''}</span>
+      <button class="btn" data-up="${i}" ${i ? '' : 'disabled'}>Monter</button>
+      <button class="btn" data-del="${i}">Retirer</button>
+    </div>`).join('');
+  $('nList').querySelectorAll('[data-up]').forEach((b) => b.onclick = () => moveNet(+b.dataset.up));
+  $('nList').querySelectorAll('[data-del]').forEach((b) => b.onclick = () => delNet(+b.dataset.del));
+  $('nBtnToggle').textContent = on ? 'Désactiver les proxys' : 'Activer les proxys';
+  $('nBtnToggle').disabled = !NET.proxies.length;
+  $('tNet').textContent = on ? `${NET.proxies.length} proxy${NET.proxies.length > 1 ? 's' : ''}` : 'Directe';
+  $('hNet').textContent = on ? `en tête : ${NET.proxies[0].name}` : 'cliquer pour régler';
 }
+// Les mots de passe ne reviennent jamais au navigateur : vide = inchangé côté serveur.
+const plain = () => NET.proxies.map(({ name, server, username }) => ({ name, server, username }));
 async function saveNet(body) {
   const r = await fetch('/api/net', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) });
   const j = await r.json();
   if (!r.ok) throw new Error(j.error || 'Échec');
   NET = j; await loadNet();
+}
+async function moveNet(i) { const l = plain(); [l[i - 1], l[i]] = [l[i], l[i - 1]]; try { await saveNet({ proxies: l }); } catch (e) { alert(`Échec : ${e.message}`); } }
+async function delNet(i) {
+  const l = plain(); l.splice(i, 1);
+  try { await saveNet({ proxies: l, ...(l.length ? {} : { enabled: false }) }); } catch (e) { alert(`Échec : ${e.message}`); }
+}
+$('nBtnAdd').onclick = () => { const p = $('nAdd'); p.hidden = !p.hidden; $('nMsg').textContent = ''; };
+$('nAddOk').onclick = async () => {
+  const add = { name: $('nName').value, server: $('nServer').value.trim(), username: $('nUser').value, password: $('nPass').value };
+  try {
+    await saveNet({ proxies: [...plain(), add], enabled: true });
+    for (const id of ['nName', 'nServer', 'nUser', 'nPass']) $(id).value = '';
+    $('nMsg').textContent = 'Ajouté. Crée une nouvelle session pour l\'utiliser.';
+  } catch (e) { $('nMsg').textContent = `Échec : ${e.message}`; }
+};
+$('nBtnTz').onclick = () => { const p = $('nTzPanel'); p.hidden = !p.hidden; if (!p.hidden) $('nTz').value = NET?.timezone ?? ''; $('nTzMsg').textContent = ''; };
+$('nTzSave').onclick = async () => {
+  try { await saveNet({ timezone: $('nTz').value }); $('nTzMsg').textContent = 'Enregistré.'; } catch (e) { $('nTzMsg').textContent = `Échec : ${e.message}`; }
+};
+$('nBtnToggle').onclick = async () => {
+  try { await saveNet({ enabled: !(NET.enabled && NET.proxies.length) }); } catch (e) { alert(`Échec : ${e.message}`); }
+};
+$('nBtnTest').onclick = async () => {
+  $('nTest').hidden = false; $('nTestOut').textContent = 'Test en cours : ouverture d\'un navigateur par chaque proxy...';
+  try {
+    const list = await (await fetch('/api/net/test', { method: 'POST' })).json();
+    $('nTestOut').textContent = list.map((t) => t.ok
+      ? `${t.name} : réussi en ${(t.ms / 1000).toFixed(1)} s. Les sites voient ${t.query}, ${t.country} (${t.countryCode}), ${t.city}, ${t.isp}`
+      : `${t.name} : échec, ${t.error || t.message || 'réponse invalide'}`).join('\n');
+  } catch (e) { $('nTestOut').textContent = `Échec : ${e.message}`; }
+};
+loadNet();
 }
 $('nBtnEdit').onclick = () => {
   const p = $('nEdit'); p.hidden = !p.hidden;
