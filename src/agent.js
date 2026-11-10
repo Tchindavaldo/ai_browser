@@ -85,7 +85,14 @@ export class Session {
     this.cancelled = false;
     this.ac = new AbortController();
     // Total des jetons et du coût de cette demande.
-    const total = { input: 0, output: 0, usd: 0, cfa: 0, unknown: false };
+    const total = { input: 0, output: 0, usd: 0, cfa: 0, unknown: false, bytes: 0 };
+    // Données consommées par les pages depuis la dernière mesure.
+    let mark = this.tab.bytes ?? 0;
+    const measure = (step) => {
+      const now = this.tab.bytes ?? 0, d = Math.max(0, now - mark);
+      mark = now; total.bytes += d;
+      onEvent({ type: 'data', step, bytes: d, total: total.bytes });
+    };
     const withTotal = (res) => ({ ...res, usage: { ...total } });
 
     try {
@@ -138,6 +145,7 @@ export class Session {
           onEvent({ type: 'action', step, name, args: params });
 
           if (name === 'done') {
+            measure(step);
             const res = withTotal({ success: !!params.success, result: params.result ?? '', steps: step });
             this.messages.push({ role: 'tool', tool_call_id: call.id, content: 'Tâche terminée.' });
             onEvent({ type: 'done', step, ...res });
@@ -160,6 +168,7 @@ export class Session {
 
         this.#check();
         const snap = await this.tab.snapshot();
+        measure(step);
         const state = `ÉTAT DU NAVIGATEUR:\n${renderSnapshot(snap)}`;
         // Lecture de la page impossible (page figée, en plein chargement) : la capture montre où elle en est.
         if (snap.error && !failed) failed = 'lecture de la page';

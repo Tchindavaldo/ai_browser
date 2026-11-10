@@ -91,7 +91,15 @@ le paiement et va jusqu'à l'accueil de Netflix. Une capture est envoyée à cha
 Les valeurs entre crochets se remplacent au moment de lancer la tâche, dans le champ
 de la session. Ne jamais les écrire dans ce fichier ni dans un fichier du dépôt.
 
-Cocher l'option « Capture à chaque étape » de la session avant de lancer.
+L'option « Capture à chaque étape » de la session n'est pas nécessaire : elle envoie
+une image au modèle à chaque étape et multiplie les jetons envoyés (donc le coût).
+Les captures demandées dans le prompt suffisent.
+
+> **Constaté le 10 novembre 2026** (avant l'accélération de la fin, point 8) :
+> 37 étapes en 3 min 10 s, 606 412 jetons envoyés et 6 894 reçus avec GLM 5.3 Flash
+> via OpenRouter, soit 13,4 F CFA (0,023 USD), en passant par un proxy au Cameroun.
+> Paiement validé à l'étape 20 ; les 17 étapes suivantes (profils, langues,
+> application) ont pris 1 min 37 s.
 
 ### Le prompt
 
@@ -132,9 +140,11 @@ INSTRUCTIONS DÉTAILLÉES :
 
 7. Clique sur « Activer mon abonnement » (ou le bouton de validation équivalent).
 
-8. Continue toutes les étapes suivantes (profils, préférences, appareils...) en
-   choisissant les options par défaut ou « Passer », jusqu'à arriver sur l'accueil
-   de Netflix avec les films et séries.
+8. Une fois le paiement validé, les étapes suivantes (profils, profils enfants,
+   langues, application, appareils...) n'ont rien d'important : va vite. Sur chaque
+   page, clique directement sur « Passer », « Suivant », « Plus tard » ou le bouton
+   par défaut, sans rien remplir, sans attendre (pas d'outil wait) et sans capture,
+   jusqu'à arriver sur l'accueil de Netflix avec les films et séries.
 
 9. Si une vérification est demandée (code par e-mail ou SMS, validation 3D Secure
    de la banque) : prends une capture avec l'outil screenshot, puis appelle done en
@@ -144,10 +154,9 @@ INSTRUCTIONS DÉTAILLÉES :
 10. Peu importe les erreurs rencontrées : lis toujours le contenu de la page pour
     savoir où tu es et ce qu'il faut faire, continue, et va le plus loin possible.
 
-11. Dès que tu as cliqué sur « Activer mon abonnement », prends une capture avec
-    l'outil screenshot à chaque nouvelle étape, avec dossier = "netflix/tache-1"
-    et un label qui nomme l'étape (ex. "paiement-valide", "profils", "accueil").
-    La dernière capture est celle de l'accueil de Netflix.
+11. Captures avec l'outil screenshot, dossier = "netflix/tache-1" : une seule
+    quand le paiement est validé (label "paiement-valide"), puis une dernière sur
+    l'accueil de Netflix (label "accueil"). Aucune entre les deux.
 ```
 
 Après un done pour un code, il suffit d'envoyer le code dans la même session : la

@@ -99,6 +99,9 @@ export class Tab {
     this.host = host;
     this.console = [];
     this.network = [];
+    // Données échangées par les pages de cet onglet (octets, en-têtes compris) :
+    // c'est ce qui passe par la connexion de sortie (proxy ou serveur).
+    this.bytes = 0;
     this.attach(page);
   }
 
@@ -116,6 +119,11 @@ export class Tab {
     });
     // Une popup ouverte par la page devient la page active de cet onglet.
     page.on('popup', (p) => this.attach(p));
+    page.on('requestfinished', (r) => {
+      r.sizes().then((s) => {
+        this.bytes += s.requestHeadersSize + s.requestBodySize + s.responseHeadersSize + s.responseBodySize;
+      }).catch(() => {});
+    });
   }
 
   #push(arr, line, max) {

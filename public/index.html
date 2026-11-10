@@ -757,6 +757,13 @@ function closeStep(ts) {
   if (!curEl || !curEl.dataset.start || !ts) return;
   curEl.querySelector('.dur').textContent = fmtDur(ts - Number(curEl.dataset.start));
 }
+/** Octets en Ko / Mo / Go, en français. */
+function fmtBytes(n) {
+  n = Number(n || 0);
+  if (n < 1024 * 1024) return `${(n / 1024).toLocaleString('fr-FR', { maximumFractionDigits: 0 })} Ko`;
+  if (n < 1024 ** 3) return `${(n / 1024 ** 2).toLocaleString('fr-FR', { maximumFractionDigits: 1 })} Mo`;
+  return `${(n / 1024 ** 3).toLocaleString('fr-FR', { maximumFractionDigits: 2 })} Go`;
+}
 const fmtTok = (n) => Number(n || 0).toLocaleString('fr-FR');
 /** Montant en francs CFA puis en dollars ; petits montants avec assez de décimales pour rester lisibles. */
 function fmtCost(usd, cfa) {
@@ -806,6 +813,12 @@ function apply(ev) {
       `<div class="cost">Jetons : ${fmtTok(ev.input)} envoyés, ${fmtTok(ev.output)} reçus · ${fmtCost(ev.usd, ev.cfa)}</div>`);
     return;
   }
+  if (ev.type === 'data') {
+    // Données chargées par les pages pendant cette étape (passent par le proxy s'il y en a un).
+    stepEl(ev.step, ev.ts).insertAdjacentHTML('beforeend',
+      `<div class="cost">Données : ${fmtBytes(ev.bytes)} à cette étape, ${fmtBytes(ev.total)} depuis le début de la demande</div>`);
+    return;
+  }
   if (ev.type === 'title') {
     stepEl(ev.step, ev.ts).querySelector('.ttl').textContent = ev.text;
     return;
@@ -850,7 +863,8 @@ function apply(ev) {
     const u = ev.usage;
     const cost = u && (u.input || u.output)
       ? `<div class="dur-total">Total : ${fmtTok(u.input + u.output)} jetons (${fmtTok(u.input)} envoyés, ${fmtTok(u.output)} reçus) · ${fmtCost(u.usd, u.cfa)}${u.unknown ? ' (prix inconnu pour une partie des étapes)' : ''}</div>` : '';
-    say('done' + (ev.success ? '' : ' ko'), esc(ev.result) + total + cost);
+    const data = u && u.bytes !== undefined ? `<div class="dur-total">Données consommées : ${fmtBytes(u.bytes)}</div>` : '';
+    say('done' + (ev.success ? '' : ' ko'), esc(ev.result) + total + cost + data);
     $('stepTxt').textContent = ''; curStep = null; curEl = null; runStart = null; lastModel = null;
   }
 }
