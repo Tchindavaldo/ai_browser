@@ -3,5 +3,6 @@ captures/
 .env
 *.log
 llm-settings.json
+browser-settings.json
 fly-secrets.env
 llm-pauses.json

@@ -7,6 +7,7 @@ import { CAPTURES } from './browser.js';
 import { modelName, llmState, updateSettings, testChain, keyFor } from './llm.js';
 import { provider, listModels } from './providers.js';
 import { spec } from './openapi.js';
+import { netState, updateNet, testNet } from './netconf.js';
 
 const PORT = Number(process.env.RAUVALIA_PORT || 7331);
 // 0.0.0.0 pour exposer sur le réseau local / derrière un tunnel ; 127.0.0.1 par défaut.
@@ -252,6 +253,11 @@ const server = http.createServer(async (req, res) => {
     }
 
     // --- Modèles IA ---
+    if (url.pathname === '/api/net' && req.method === 'GET') return json(res, 200, netState());
+    if (url.pathname === '/api/net' && req.method === 'POST') {
+      try { return json(res, 200, updateNet(await readBody(req))); } catch (e) { return json(res, 400, { error: e.message }); }
+    }
+    if (url.pathname === '/api/net/test' && req.method === 'POST') return json(res, 200, await testNet());
     if (url.pathname === '/api/llm' && req.method === 'GET') return json(res, 200, llmState());
     if (url.pathname === '/api/llm' && req.method === 'POST') {
       try { return json(res, 200, updateSettings(await readBody(req))); }

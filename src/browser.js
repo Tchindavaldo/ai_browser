@@ -2,6 +2,7 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { chromium, firefox, webkit } from 'playwright';
+import { proxyOption, timezoneOption } from './netconf.js';
 
 const ENGINES = {
   firefox: {
@@ -52,13 +53,16 @@ export class BrowserHost {
       headless: this.headless,
       args: eng.args,
       channel: eng.channel,
-      executablePath: eng.executablePath
+      executablePath: eng.executablePath,
+      // Proxy réglé dans la vue « Connexion » (ex. adresse IP au Cameroun).
+      proxy: proxyOption()
     });
     // Un contexte neuf = profil invite : aucun cookie, aucune session héritée.
     this.context = await this.browser.newContext({
       viewport: this.opts.viewport,
       locale: this.opts.locale,
-      userAgent: eng.userAgent
+      userAgent: eng.userAgent,
+      timezoneId: timezoneOption()
     });
     return this;
   }

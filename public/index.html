@@ -403,6 +403,10 @@ form textarea { flex: 1; resize: none; max-height: 140px; padding: 9px 12px; bor
     <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
       <rect x="6" y="6" width="12" height="12" rx="2"/><path d="M9 2v4M15 2v4M9 18v4M15 18v4M2 9h4M2 15h4M18 9h4M18 15h4"/></svg>
   </button>
+  <button id="navNet" title="Connexion (pays, proxy)">
+    <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+      <circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a14 14 0 0 1 0 18M12 3a14 14 0 0 0 0 18"/></svg>
+  </button>
   <div class="spacer"></div>
   <a href="/docs" target="_blank" rel="noopener" title="Documentation de l'API"
      style="width:40px;height:40px;border-radius:10px;display:grid;place-items:center;color:var(--faint);text-decoration:none">
@@ -461,6 +465,7 @@ form textarea { flex: 1; resize: none; max-height: 140px; padding: 9px 12px; bor
       <div class="tile"><div class="k">Navigateurs</div><div class="v" id="tBrowsers">0</div><div class="h" id="hBrowsers">aucun profil ouvert</div></div>
       <div class="tile live"><div class="k">Tâches en cours</div><div class="v" id="tRunning">0</div><div class="h" id="hRunning">rien en exécution</div></div>
       <div class="tile click" id="tileModel" title="Choisir les modèles IA"><div class="k">Modèle IA</div><div class="v small" id="tModel">...</div><div class="h" id="hModel">cliquer pour changer</div></div>
+      <div class="tile click" id="tileNet" title="Régler la connexion du navigateur"><div class="k">Connexion</div><div class="v small" id="tNet">...</div><div class="h" id="hNet">cliquer pour changer</div></div>
       <div class="tile accent"><div class="k">Actions exécutées</div><div class="v" id="tActions">0</div><div class="h" id="hActions">sur 0 tâche</div></div>
     </div>
 
@@ -516,6 +521,35 @@ form textarea { flex: 1; resize: none; max-height: 140px; padding: 9px 12px; bor
     </div>
 
     <div class="mcard mpanel" id="mTest" hidden><pre class="tres" id="mTestOut"></pre></div>
+  </div>
+
+  <!-- ======================= CONNEXION ======================= -->
+  <div class="view" id="net">
+    <div class="sec-title">Connexion du navigateur de l'agent</div>
+    <div class="mcard">
+      <div class="nstate" id="nState"></div>
+      <p class="mnote">Sans proxy, les sites voient l'adresse du serveur. Avec un proxy, ils voient celle du proxy (par exemple une adresse au Cameroun). Le réglage s'applique aux navigateurs ouverts ensuite : créer une nouvelle session après l'avoir changé.</p>
+    </div>
+    <div class="mact">
+      <button class="btn primary" id="nBtnEdit">Régler le proxy</button>
+      <button class="btn" id="nBtnTest">Tester</button>
+      <button class="btn" id="nBtnToggle"></button>
+    </div>
+    <div class="mcard mpanel" id="nEdit" hidden>
+      <div class="mform">
+        <input id="nServer" class="grow" placeholder="Adresse du proxy, ex. http://102.244.78.61:8089 ou socks5://hote:1080">
+      </div>
+      <div class="mform" style="margin-top:8px">
+        <input id="nUser" class="grow" placeholder="Identifiant (si le proxy en demande un)">
+        <input id="nPass" class="grow" type="password" placeholder="Mot de passe (vide = inchangé, - pour effacer)">
+      </div>
+      <div class="mform" style="margin-top:8px">
+        <input id="nTz" class="grow" placeholder="Fuseau horaire, ex. Africa/Douala">
+        <button class="btn primary" id="nSave">Enregistrer</button>
+      </div>
+      <p class="mnote" id="nMsg"></p>
+    </div>
+    <div class="mcard mpanel" id="nTest" hidden><pre class="tres" id="nTestOut"></pre></div>
   </div>
 
   <!-- ======================= ESPACE DE TRAVAIL ======================= -->
@@ -580,12 +614,13 @@ const active = () => ST.sessions.find((s) => s.id === ST.activeId);
 /* ================= navigation ================= */
 function setView(v) {
   view = v;
-  for (const [id, nav] of [['dash', 'navDash'], ['work', 'navWork'], ['models', 'navModels']]) {
+  for (const [id, nav] of [['dash', 'navDash'], ['work', 'navWork'], ['models', 'navModels'], ['net', 'navNet']]) {
     $(id).classList.toggle('on', v === id);
     $(nav).classList.toggle('on', v === id);
   }
-  $('viewTitle').textContent = { dash: 'Tableau de bord', work: 'Espace de travail', models: 'Modèles IA' }[v];
+  $('viewTitle').textContent = { dash: 'Tableau de bord', work: 'Espace de travail', models: 'Modèles IA', net: 'Connexion' }[v];
   if (v === 'models') loadLlm();
+  if (v === 'net') loadNet();
   const a = active();
   $('viewSub').textContent = v === 'work' && a ? `· ${a.title} · ${a.browserLabel ?? ''}${a.headless !== undefined ? (a.headless ? ' · sans fenêtre' : ' · fenêtre visible') : ''}` : '';
   if (v === 'dash') refreshThumbs();
@@ -593,6 +628,8 @@ function setView(v) {
 $('navDash').onclick = () => setView('dash');
 $('navModels').onclick = () => setView('models');
 $('tileModel').onclick = () => setView('models');
+$('navNet').onclick = () => setView('net');
+$('tileNet').onclick = () => setView('net');
 $('navWork').onclick = () => { if (!ST.sessions.length) { openPop(true); return; } setView('work'); };
 
 /* ================= popover ================= */
@@ -1070,6 +1107,49 @@ $('sModel').onchange = () => setSessionModel($('sProv').value, $('sModel').value
 let LLM = { chain: [], providers: [], cooldowns: {}, fallback: true };
 let MODELS = [];
 const pname = (id) => LLM.providers.find((p) => p.id === id)?.name ?? id;
+
+/* ================= connexion (proxy) ================= */
+let NET = null;
+async function loadNet() {
+  try { NET = await (await fetch('/api/net')).json(); } catch { return; }
+  const on = NET.enabled && NET.server;
+  $('nState').innerHTML = on
+    ? `<b>Proxy actif</b> : ${esc(NET.server)}${NET.username ? ` (identifiant ${esc(NET.username)})` : ''}<br>Fuseau horaire : ${esc(NET.timezone || 'celui du serveur')}`
+    : `<b>Sans proxy</b> : connexion directe depuis le serveur.${NET.server ? `<br>Proxy enregistré mais désactivé : ${esc(NET.server)}` : ''}`;
+  $('nBtnToggle').textContent = on ? 'Désactiver le proxy' : 'Activer le proxy';
+  $('nBtnToggle').disabled = !NET.server;
+  $('tNet').textContent = on ? 'Proxy' : 'Directe';
+  $('hNet').textContent = on ? NET.server.replace(/^\w+:\/\//, '') : 'cliquer pour régler';
+}
+async function saveNet(body) {
+  const r = await fetch('/api/net', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) });
+  const j = await r.json();
+  if (!r.ok) throw new Error(j.error || 'Échec');
+  NET = j; await loadNet();
+}
+$('nBtnEdit').onclick = () => {
+  const p = $('nEdit'); p.hidden = !p.hidden;
+  if (!p.hidden && NET) { $('nServer').value = NET.server; $('nUser').value = NET.username; $('nPass').value = ''; $('nTz').value = NET.timezone; $('nMsg').textContent = ''; }
+};
+$('nSave').onclick = async () => {
+  try {
+    await saveNet({ server: $('nServer').value, username: $('nUser').value, password: $('nPass').value, timezone: $('nTz').value, enabled: !!$('nServer').value.trim() });
+    $('nMsg').textContent = 'Enregistré. Crée une nouvelle session pour l\'utiliser.';
+  } catch (e) { $('nMsg').textContent = `Échec : ${e.message}`; }
+};
+$('nBtnToggle').onclick = async () => {
+  try { await saveNet({ enabled: !(NET.enabled && NET.server) }); } catch (e) { alert(`Échec : ${e.message}`); }
+};
+$('nBtnTest').onclick = async () => {
+  $('nTest').hidden = false; $('nTestOut').textContent = 'Test en cours : ouverture d\'un navigateur par la connexion réglée...';
+  try {
+    const t = await (await fetch('/api/net/test', { method: 'POST' })).json();
+    $('nTestOut').textContent = t.ok
+      ? `Réussi en ${(t.ms / 1000).toFixed(1)} s${t.viaProxy ? ' (par le proxy)' : ' (connexion directe)'}.\nLes sites voient : ${t.query}\nPays : ${t.country} (${t.countryCode})\nVille : ${t.city}\nFournisseur : ${t.isp}`
+      : `Échec${t.viaProxy ? ' par le proxy' : ''} : ${t.error || t.message || 'réponse invalide'}`;
+  } catch (e) { $('nTestOut').textContent = `Échec : ${e.message}`; }
+};
+loadNet();
 
 async function loadLlm() {
   LLM = await (await fetch('/api/llm')).json();
