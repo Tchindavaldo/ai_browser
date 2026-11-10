@@ -1177,30 +1177,6 @@ $('nBtnTest').onclick = async () => {
   } catch (e) { $('nTestOut').textContent = `Échec : ${e.message}`; }
 };
 loadNet();
-}
-$('nBtnEdit').onclick = () => {
-  const p = $('nEdit'); p.hidden = !p.hidden;
-  if (!p.hidden && NET) { $('nServer').value = NET.server; $('nUser').value = NET.username; $('nPass').value = ''; $('nTz').value = NET.timezone; $('nMsg').textContent = ''; }
-};
-$('nSave').onclick = async () => {
-  try {
-    await saveNet({ server: $('nServer').value, username: $('nUser').value, password: $('nPass').value, timezone: $('nTz').value, enabled: !!$('nServer').value.trim() });
-    $('nMsg').textContent = 'Enregistré. Crée une nouvelle session pour l\'utiliser.';
-  } catch (e) { $('nMsg').textContent = `Échec : ${e.message}`; }
-};
-$('nBtnToggle').onclick = async () => {
-  try { await saveNet({ enabled: !(NET.enabled && NET.server) }); } catch (e) { alert(`Échec : ${e.message}`); }
-};
-$('nBtnTest').onclick = async () => {
-  $('nTest').hidden = false; $('nTestOut').textContent = 'Test en cours : ouverture d\'un navigateur par la connexion réglée...';
-  try {
-    const t = await (await fetch('/api/net/test', { method: 'POST' })).json();
-    $('nTestOut').textContent = t.ok
-      ? `Réussi en ${(t.ms / 1000).toFixed(1)} s${t.viaProxy ? ' (par le proxy)' : ' (connexion directe)'}.\nLes sites voient : ${t.query}\nPays : ${t.country} (${t.countryCode})\nVille : ${t.city}\nFournisseur : ${t.isp}`
-      : `Échec${t.viaProxy ? ' par le proxy' : ''} : ${t.error || t.message || 'réponse invalide'}`;
-  } catch (e) { $('nTestOut').textContent = `Échec : ${e.message}`; }
-};
-loadNet();
 
 async function loadLlm() {
   LLM = await (await fetch('/api/llm')).json();
