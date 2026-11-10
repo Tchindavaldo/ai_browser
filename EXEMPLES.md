@@ -85,7 +85,7 @@ d'utilisation, et coupent l'accès aux comptes concernés.
 
 Variante du parcours Netflix quand le compte existe déjà : l'agent part toujours de
 la page d'inscription, se connecte si Netflix le renvoie vers la connexion, termine
-le paiement et va jusqu'à l'accueil de Netflix. Une capture est envoyée à chaque étape.
+le paiement et va jusqu'à l'accueil de Netflix.
 
 **Attention : ce parcours valide un vrai abonnement payant avec une vraie carte.**
 Les valeurs entre crochets se remplacent au moment de lancer la tâche, dans le champ
@@ -103,9 +103,8 @@ Cocher l'option « Capture à chaque étape » de la session avant de lancer.
 
 ```
 OBJECTIF : Sur Netflix, avec mon compte existant, va au bout de l'abonnement au plan
-le moins cher jusqu'à arriver sur l'accueil de Netflix. Envoie-moi une capture
-d'écran à chaque étape. Lis toujours le contenu de la page pour savoir où tu es et
-ce qu'il faut faire.
+le moins cher jusqu'à arriver sur l'accueil de Netflix. Lis toujours le contenu de
+la page pour savoir où tu es et ce qu'il faut faire.
 
 IDENTIFIANTS :
 - E-mail : [E-MAIL]
