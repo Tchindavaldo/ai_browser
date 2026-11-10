@@ -256,17 +256,22 @@ export class Tab {
    * Capture enregistrée sur disque, destinée à être livrée à l'utilisateur.
    * Retourne de quoi l'afficher et la télécharger.
    */
-  async saveCapture({ fullPage = false, label } = {}) {
-    await fs.mkdir(CAPTURES, { recursive: true });
+  async saveCapture({ fullPage = false, label, folder } = {}) {
+    // Dossier facultatif (ex. « netflix/tache-2 ») : chaque morceau est nettoyé, rien ne sort de CAPTURES.
+    const sub = String(folder ?? '').split(/[\\/]+/)
+      .map((x) => x.toLowerCase().replace(/[^a-z0-9_-]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 40))
+      .filter(Boolean).slice(0, 3).join('/');
+    const dir = sub ? path.join(CAPTURES, sub) : CAPTURES;
+    await fs.mkdir(dir, { recursive: true });
     const stamp = new Date().toISOString().replace(/[:.]/g, '-');
     const slug = String(label ?? 'capture').toLowerCase().replace(/[^a-z0-9]+/g, '-').slice(0, 40).replace(/^-|-$/g, '');
     const name = `${stamp}_${slug || 'capture'}.png`;
-    const file = path.join(CAPTURES, name);
+    const file = path.join(dir, name);
     const buf = await this.page.screenshot({ type: 'png', fullPage });
     await fs.writeFile(file, buf);
     return {
-      file, name,
-      url: `/captures/${name}`,
+      file, name, folder: sub,
+      url: `/captures/${sub ? `${sub}/` : ''}${name}`,
       bytes: buf.length,
       pageUrl: this.page.url(),
       title: await this.page.title().catch(() => ''),

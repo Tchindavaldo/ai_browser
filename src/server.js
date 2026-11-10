@@ -117,10 +117,13 @@ const server = http.createServer(async (req, res) => {
 
     if (url.pathname === '/api/captures') {
       let files = [];
-      try { files = await fs.readdir(CAPTURES); } catch { /* dossier pas encore créé */ }
-      const captures = (await Promise.all(files.filter((f) => /\.(png|jpe?g)$/i.test(f)).map(async (name) => {
-        const st = await fs.stat(path.join(CAPTURES, name));
-        return { name, url: `/captures/${name}`, bytes: st.size, ts: st.mtimeMs };
+      // Sous-dossiers compris (captures rangées par l'agent, ex. netflix/tache-1).
+      try { files = await fs.readdir(CAPTURES, { recursive: true }); } catch { /* dossier pas encore créé */ }
+      const captures = (await Promise.all(files.filter((f) => /\.(png|jpe?g)$/i.test(f)).map(async (f) => {
+        const rel = f.split(path.sep).join('/');
+        const st = await fs.stat(path.join(CAPTURES, f));
+        const i = rel.lastIndexOf('/');
+        return { name: rel.slice(i + 1), folder: i < 0 ? '' : rel.slice(0, i), url: `/captures/${rel}`, bytes: st.size, ts: st.mtimeMs };
       }))).sort((a, b) => b.ts - a.ts);
       return json(res, 200, { captures });
     }

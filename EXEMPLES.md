@@ -81,6 +81,81 @@ d'utilisation, et coupent l'accès aux comptes concernés.
 
 ---
 
+## Compte existant — connexion et abonnement jusqu'au bout
+
+Variante du parcours Netflix quand le compte existe déjà : l'agent part toujours de
+la page d'inscription, se connecte si Netflix le renvoie vers la connexion, termine
+le paiement et va jusqu'à l'accueil de Netflix. Une capture est envoyée à chaque étape.
+
+**Attention : ce parcours valide un vrai abonnement payant avec une vraie carte.**
+Les valeurs entre crochets se remplacent au moment de lancer la tâche, dans le champ
+de la session. Ne jamais les écrire dans ce fichier ni dans un fichier du dépôt.
+
+Cocher l'option « Capture à chaque étape » de la session avant de lancer.
+
+### Le prompt
+
+```
+OBJECTIF : Sur Netflix, avec mon compte existant, va au bout de l'abonnement au plan
+le moins cher jusqu'à arriver sur l'accueil de Netflix. Envoie-moi une capture
+d'écran à chaque étape. Lis toujours le contenu de la page pour savoir où tu es et
+ce qu'il faut faire.
+
+IDENTIFIANTS :
+- E-mail : [E-MAIL]
+- Mot de passe : [MOT DE PASSE]
+
+PAIEMENT :
+- Numéro de carte : [NUMÉRO DE CARTE]
+- Date d'expiration : [MM/AA]
+- Cryptogramme : [CVC]
+- Nom figurant sur la carte : [NOM SUR LA CARTE]
+
+INSTRUCTIONS DÉTAILLÉES :
+
+1. Navigue vers https://www.netflix.com/signup (page de base).
+
+2. Clique sur « Suivant » pour passer l'étape de choix de l'offre.
+
+3. Sélectionne le plan le moins cher. Clique ensuite sur « Suivant ».
+
+4. Sur le formulaire de compte, remplis l'e-mail et le mot de passe ci-dessus,
+   coche la case de consentement si elle est présente, et clique sur « Suivant ».
+
+5. Si Netflix indique que le compte existe déjà ou te renvoie vers la page de
+   connexion : connecte-toi avec ces mêmes identifiants. Une fois connecté, si tu
+   n'es pas renvoyé vers le parcours d'abonnement, retourne sur
+   https://www.netflix.com/signup et reprends là où tu en étais.
+
+6. À l'étape de paiement, clique sur « Carte de crédit ou de débit » et remplis TOUS
+   les champs avec les données de paiement ci-dessus, puis coche « J'accepte ».
+
+7. Clique sur « Activer mon abonnement » (ou le bouton de validation équivalent).
+
+8. Continue toutes les étapes suivantes (profils, préférences, appareils...) en
+   choisissant les options par défaut ou « Passer », jusqu'à arriver sur l'accueil
+   de Netflix avec les films et séries.
+
+9. Si une vérification est demandée (code par e-mail ou SMS, validation 3D Secure
+   de la banque) : prends une capture avec l'outil screenshot, puis appelle done en
+   me disant précisément ce qui est demandé. Je te répondrai avec le code dans la
+   conversation : remplis-le alors dans le champ et continue le parcours.
+
+10. Peu importe les erreurs rencontrées : lis toujours le contenu de la page pour
+    savoir où tu es et ce qu'il faut faire, continue, et va le plus loin possible.
+
+11. Dès que tu as cliqué sur « Activer mon abonnement », prends une capture avec
+    l'outil screenshot à chaque nouvelle étape, avec dossier = "netflix/tache-1"
+    et un label qui nomme l'étape (ex. "paiement-valide", "profils", "accueil").
+    La dernière capture est celle de l'accueil de Netflix.
+```
+
+Après un done pour un code, il suffit d'envoyer le code dans la même session : la
+conversation et le navigateur restent là où l'agent s'est arrêté. Pour une nouvelle
+tâche, changer le numéro du dossier (`netflix/tache-2`...).
+
+---
+
 ## Écrire un bon objectif
 
 Ce qui marche, d'après les essais :

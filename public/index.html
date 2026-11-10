@@ -331,6 +331,18 @@ select:focus, input:focus, textarea:focus { outline: none; border-color: var(--a
 .msg.shot .cap span { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .msg.shot .dl { color: var(--accent); text-decoration: none; font-weight: 600; }
 .msg.shot .dl:hover { text-decoration: underline; }
+.capbtn { font-size: 12.5px; padding: 0 10px; }
+.capbtn span { color: var(--faint); margin-left: 2px; }
+#capPanel { border-bottom: 1px solid var(--line); background: var(--surface); padding: 10px 12px; max-height: 45%; overflow: auto; }
+#capPanel .grp { margin-bottom: 12px; }
+#capPanel .grp h4 { margin: 0 0 6px; font-size: 12.5px; font-weight: 600; }
+#capPanel .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 8px; }
+#capPanel .it { border: 1px solid var(--line); border-radius: var(--r-sm); overflow: hidden; font-size: 11.5px; }
+#capPanel .it img { display: block; width: 100%; height: 90px; object-fit: cover; object-position: top; }
+#capPanel .it .cap { display: flex; gap: 6px; padding: 4px 6px; align-items: center; }
+#capPanel .it .cap span { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+#capPanel .it a.dl { color: var(--accent); text-decoration: none; font-weight: 600; }
+#capPanel .none { color: var(--faint); font-size: 12.5px; }
 
 form { flex: none; display: flex; gap: 9px; padding: 12px; border-top: 1px solid var(--line); background: var(--surface); }
 form textarea { flex: 1; resize: none; max-height: 140px; padding: 9px 12px; border-radius: var(--r-sm); }
@@ -517,11 +529,13 @@ form textarea { flex: 1; resize: none; max-height: 140px; padding: 9px 12px; bor
           <button class="btn icon warn" id="btnCancel" title="Couper la tâche en cours" disabled>
             <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="6" width="12" height="12" rx="2"/></svg>
           </button>
+          <button class="btn capbtn" id="btnCaps" title="Captures enregistrées dans cette conversation">Captures <span id="capN">0</span></button>
           <button class="btn icon" id="btnClear" title="Nettoyer la session" disabled>
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
               <path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14"/></svg>
           </button>
         </div>
+        <div id="capPanel" hidden></div>
         <div id="log"></div>
         <div class="smodel">
           <span class="lbl">Modèle de cette session</span>
@@ -777,6 +791,7 @@ function apply(ev) {
     brain.scrollTop = brain.scrollHeight; return;
   }
   if (ev.type === 'artifact') {
+    sessCaps.push(ev); renderCaps();
     // Livrable produit par l'agent : affiché dans la conversation et téléchargeable.
     say('shot',
       `<a href="${esc(ev.url)}" target="_blank" rel="noopener"><img src="${esc(ev.url)}" alt="${esc(ev.name)}"></a>
@@ -870,10 +885,29 @@ async function refresh() { const keep = ST.activeId; ST = await (await fetch('/a
   if (keep && ST.sessions.some((s) => s.id === keep)) ST.activeId = keep; render(); }
 
 let loadedId = null;   // session dont l'historique est actuellement affiché
+let sessCaps = [];     // captures livrées dans la conversation affichée
+
+/** Panneau « Captures » : les captures de cette conversation, classées par dossier. */
+function renderCaps() {
+  $('capN').textContent = sessCaps.length;
+  if ($('capPanel').hidden) return;
+  const groups = new Map();
+  for (const c of sessCaps) {
+    const k = c.folder || '';
+    if (!groups.has(k)) groups.set(k, []);
+    groups.get(k).push(c);
+  }
+  const keys = [...groups.keys()].sort((a, b) => (a === '') - (b === '') || a.localeCompare(b));
+  $('capPanel').innerHTML = keys.map((k) => `<div class="grp"><h4>${k ? esc(k) : 'Sans dossier'} (${groups.get(k).length})</h4><div class="grid">${
+    groups.get(k).map((c) => `<div class="it"><a href="${esc(c.url)}" target="_blank" rel="noopener"><img src="${esc(c.url)}" alt="${esc(c.name)}" loading="lazy"></a>
+      <div class="cap"><span title="${esc(c.name)}">${esc(c.name)}</span><a class="dl" href="${esc(c.url)}" download>Télécharger</a></div></div>`).join('')
+  }</div></div>`).join('') || '<div class="none">Aucune capture dans cette conversation pour l’instant.</div>';
+}
 
 async function loadHistory(id) {
   loadedId = id;
   $('log').innerHTML = ''; curStep = null; curEl = null;
+  sessCaps = []; renderCaps();
   $('brain').innerHTML = '<div class="empty">Réflexions et détail des actions s\'afficheront ici, étape par étape.</div>';
   $('shot').hidden = true; $('idle').hidden = false; $('bar').textContent = 'aucune page';
   const h = await (await fetch('/api/history?id=' + id)).json();
@@ -910,6 +944,7 @@ async function closeSession(id) {
 $('mkTab').onclick = () => newSession('tab');
 $('mkBrowser').onclick = () => newSession('browser');
 $('btnCancel').onclick = () => post('/api/session/cancel?id=' + ST.activeId);
+$('btnCaps').onclick = () => { $('capPanel').hidden = !$('capPanel').hidden; renderCaps(); };
 $('btnClear').onclick = async () => {
   if (!confirm('Vider l’historique de cette session et repartir sur une page blanche ?')) return;
   await post('/api/session/clear?id=' + ST.activeId);

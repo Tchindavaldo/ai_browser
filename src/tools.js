@@ -74,7 +74,8 @@ export const TOOL_SCHEMAS = [
 
   t('screenshot', "Prend une capture d'écran de la page et la livre à l'utilisateur (affichée dans la conversation, téléchargeable).", {
     full_page: { type: 'boolean', description: 'Capturer la page entière au lieu de la partie visible' },
-    label: { type: 'string', description: 'Nom court pour le fichier, ex. "panier" ou "confirmation"' }
+    label: { type: 'string', description: 'Nom court pour le fichier, ex. "panier" ou "confirmation"' },
+    dossier: { type: 'string', description: 'Dossier où ranger la capture, si l’objectif en indique un (ex. "netflix/tache-2"). Sinon laisser vide.' }
   }),
 
   t('done', "Termine la tâche. À appeler quand l'objectif est atteint OU définitivement impossible.", {
@@ -187,10 +188,10 @@ export async function runTool(tab, name, args) {
     }
 
     case 'screenshot': {
-      const cap = await tab.saveCapture({ fullPage: !!args.full_page, label: args.label });
+      const cap = await tab.saveCapture({ fullPage: !!args.full_page, label: args.label, folder: args.dossier });
       return {
         seen: true,
-        output: `Capture enregistrée et envoyée à l'utilisateur (tu la verras aussi si ton modèle lit les images) : ${cap.name} (${Math.round(cap.bytes / 1024)} Ko, ${cap.fullPage ? 'page entière' : 'zone visible'}) — ${cap.pageUrl}`,
+        output: `Capture enregistrée et envoyée à l'utilisateur (tu la verras aussi si ton modèle lit les images) : ${cap.folder ? `${cap.folder}/` : ''}${cap.name} (${Math.round(cap.bytes / 1024)} Ko, ${cap.fullPage ? 'page entière' : 'zone visible'}) — ${cap.pageUrl}`,
         artifact: { kind: 'image', ...cap }
       };
     }
