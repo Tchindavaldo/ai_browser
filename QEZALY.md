@@ -9,8 +9,6 @@ normale (titre « Qezaly netflix ... »), où l'admin peut reprendre la main apr
 
 - Fly arrête la machine quand aucune requête n'arrive. Tant qu'une tâche tourne ou attend,
   l'agent appelle sa propre adresse publique (`/api/health`) chaque minute pour rester allumé.
-- Chaque tâche lance son propre Chromium (profil cloisonné) : compter environ 300 à 400 Mo
-  par tâche. 10 tâches en même temps demandent une machine d'environ 4 Go.
 
 # Contrat back-end Qezaly <-> agent ai_browser (v1)
 
