@@ -45,6 +45,11 @@ Ex `rauvalia-web`, déplacé ici. Dépôt GitHub : `Tchindavaldo/ai_browser`.
 - Dépôts liés : `Netflix-Automation` (back-end, endpoints ; il transmet les codes et OTP
   captés dans Zoho Mail), `moobilPay-frontend-reactNative-expo` (app mobile),
   `mobilwallet-backend` (paiement Mobile Money).
+- `src/qezaly/` : file des tâches envoyées par le back-end Qezaly (abonnements Netflix et Spotify),
+  routes `/api/qezaly/*`, contrat dans `QEZALY.md`. Jeton `QEZALY_AGENT_TOKEN`.
+- Le modèle IA ne voit jamais carte ni mot de passe : repères `{{nom}}` remplacés à la saisie
+  (`Session.secrets` dans `src/agent.js`) et masqués dans ce qu'il relit.
+- Tâches en parallèle : `agent_settings.max_parallel` dans le Supabase de l'agent (10 par défaut).
 
 ## Style de réponse
 

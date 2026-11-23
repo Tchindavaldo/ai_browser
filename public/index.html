@@ -466,6 +466,7 @@ form textarea { flex: 1; resize: none; max-height: 140px; padding: 9px 12px; bor
       <div class="tile live"><div class="k">Tâches en cours</div><div class="v" id="tRunning">0</div><div class="h" id="hRunning">rien en exécution</div></div>
       <div class="tile click" id="tileModel" title="Choisir les modèles IA"><div class="k">Modèle IA</div><div class="v small" id="tModel">...</div><div class="h" id="hModel">cliquer pour changer</div></div>
       <div class="tile click" id="tileNet" title="Régler la connexion du navigateur"><div class="k">Connexion</div><div class="v small" id="tNet">...</div><div class="h" id="hNet">cliquer pour changer</div></div>
+      <div class="tile"><div class="k">Tâches Qezaly</div><div class="v" id="tQz">0</div><div class="h" id="hQz">aucune tâche reçue</div></div>
       <div class="tile accent"><div class="k">Actions exécutées</div><div class="v" id="tActions">0</div><div class="h" id="hActions">sur 0 tâche</div></div>
     </div>
 
@@ -1047,6 +1048,17 @@ setInterval(async () => {
   } catch {}
 }, 1200);
 setInterval(() => { if (view === 'dash') refreshThumbs(); }, 3000);
+// Tâches envoyées par le back-end Qezaly : en cours, en attente, limite réglée dans Supabase.
+async function refreshQz() {
+  try {
+    const q = await (await fetch('/api/qezaly/tasks')).json();
+    const failed = q.tasks.filter((t) => t.needsAdmin).length;
+    $('tQz').textContent = `${q.running}/${q.limit}`;
+    $('hQz').textContent = `${q.queued} en attente${failed ? ` · ${failed} en échec, à reprendre` : ''} · limite ${q.limitSource === 'Supabase' ? 'Supabase' : 'par défaut'}`;
+  } catch {}
+}
+refreshQz();
+setInterval(() => { if (view === 'dash') refreshQz(); }, 5000);
 // Chrono en direct pendant qu'une tâche tourne.
 setInterval(() => {
   if (runStart && active()?.busy) $('stepTxt').textContent = `étape ${curStep ?? ''} · ${fmtDur(Date.now() - runStart)}`;

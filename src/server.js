@@ -8,6 +8,8 @@ import { modelName, llmState, updateSettings, testChain, keyFor } from './llm.js
 import { provider, listModels } from './providers.js';
 import { spec } from './openapi.js';
 import { netState, updateNet, testNet } from './netconf.js';
+import { TaskQueue } from './qezaly/queue.js';
+import { handleQezaly, isQezalyPath, qezalyAuthorized } from './qezaly/routes.js';
 
 const PORT = Number(process.env.RAUVALIA_PORT || 7331);
 // 0.0.0.0 pour exposer sur le réseau local / derrière un tunnel ; 127.0.0.1 par défaut.
@@ -31,6 +33,10 @@ const manager = new Manager({
     if (['done', 'state', 'system'].includes(e.type)) broadcast({ type: 'sessions', ...manager.state() });
   }
 });
+
+// File des tâches envoyées par le back-end Qezaly (abonnements Netflix, Spotify).
+const queue = new TaskQueue(manager);
+queue.start().catch((e) => console.log(`  Qezaly : démarrage de la file impossible (${e.message})`));
 
 /** Message court et actionnable quand un moteur ne démarre pas. */
 function launchHint(engine, err) {
@@ -95,7 +101,9 @@ const server = http.createServer(async (req, res) => {
   const id = url.searchParams.get('id');
 
   try {
-    if (url.pathname !== '/api/health' && !authorized(req, url, res)) {
+    // Le back-end Qezaly a son propre jeton, valable seulement pour ses routes et ses captures.
+    const qezalyOk = isQezalyPath(url.pathname) && qezalyAuthorized(req);
+    if (url.pathname !== '/api/health' && !qezalyOk && !authorized(req, url, res)) {
       return json(res, 401, { error: 'jeton requis (Authorization: Bearer … ou ?token=…)' });
     }
     // --- Documentation OpenAPI ---
@@ -147,6 +155,9 @@ const server = http.createServer(async (req, res) => {
 
     if (url.pathname === '/api/state') return json(res, 200, manager.state());
 
+    // --- Tâches Qezaly (back-end) ---
+    if (await handleQezaly(req, res, url, { queue, json, readBody })) return;
+
     // --- Vignettes de toutes les sessions (tableau de bord) ---
     if (url.pathname === '/api/thumbs') return json(res, 200, await manager.thumbs());
 
@@ -169,7 +180,8 @@ const server = http.createServer(async (req, res) => {
     if (url.pathname === '/api/session/new' && req.method === 'POST') {
       const body = await readBody(req);
       try {
-        const rec = await manager.createSession(body);
+        const { sessionOptions, ...opts } = body; // options internes (outils, secrets) : jamais depuis l'API
+        const rec = await manager.createSession(opts);
         broadcast({ type: 'sessions', ...manager.state() });
         return json(res, 200, { id: rec.id, ...manager.state() });
       } catch (e) {

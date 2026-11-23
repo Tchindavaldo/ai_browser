@@ -67,8 +67,9 @@ export class Manager {
    * Crée une conversation.
    * @param {'browser'|'tab'} mode  nouveau navigateur (profil invite) ou nouvel onglet
    * @param {string} [hostId]       navigateur à réutiliser en mode 'tab'
+   * @param {object} [sessionOptions] options passées à la Session (outils en plus, secrets)
    */
-  async createSession({ mode = 'browser', engine, headless = true, hostId, title } = {}) {
+  async createSession({ mode = 'browser', engine, headless = true, hostId, title, sessionOptions = {} } = {}) {
     let entry;
 
     if (mode === 'tab') {
@@ -90,7 +91,7 @@ export class Manager {
       title: title || `Session ${this.sessions.size + 1}`,
       hostId: entry.id,
       tab,
-      session: new Session({ tab }),
+      session: new Session({ tab, ...sessionOptions }),
       events: [],
       createdAt: Date.now(),
       stats: { tasks: 0, actions: 0, steps: 0, objective: null, startedAt: null,
@@ -118,6 +119,21 @@ export class Manager {
       .catch((e) => this.#emit(id, { type: 'done', success: false, result: `ERREUR: ${e.message}` }))
       .finally(() => this.onEvent({ type: 'state', sessionId: id }));
     return rec;
+  }
+
+  /** Comme run, mais renvoie le résultat de la tâche (utilisé par la file Qezaly). */
+  runTask(id, objective) {
+    const rec = this.get(id);
+    if (rec.session.busy) throw new Error('une tâche est déjà en cours sur cette session');
+    this.#emit(id, { type: 'user', text: objective });
+    return rec.session
+      .run(objective, { onEvent: (e) => this.#emit(id, e) })
+      .catch((e) => {
+        const res = { success: false, result: `ERREUR: ${e.message}` };
+        this.#emit(id, { type: 'done', ...res });
+        return res;
+      })
+      .finally(() => this.onEvent({ type: 'state', sessionId: id }));
   }
 
   /** Coupe la tâche en cours. */
