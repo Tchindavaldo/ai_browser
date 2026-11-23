@@ -59,8 +59,8 @@ Ex `rauvalia-web`, déplacé ici. Dépôt GitHub : `Tchindavaldo/ai_browser`.
 
 ## Architecture
 
-- Un fichier = une responsabilité. Viser ~400 lignes, **500 = plafond** pour tout nouveau fichier.
-- `public/index.html` dépasse déjà ce plafond : le découper seulement avec accord.
+- Un fichier = une responsabilité. Viser ~400 lignes, **500 = plafond** : au-delà, découper automatiquement, sans demander.
+- `public/index.html` dépasse déjà ce plafond : le découper dès qu'on y touche.
 - Pas d'agent Explore pour « découvrir » le projet : lire ce fichier et `README.md`.
 
 ## Branches Git
@@ -79,5 +79,5 @@ Ex `rauvalia-web`, déplacé ici. Dépôt GitHub : `Tchindavaldo/ai_browser`.
 - `.claude/hooks/` (déclarés dans `.claude/settings.json`), repris du modèle yaammoo :
   - `session-start-read.sh` : injecte ce fichier au premier message de la session.
   - `no-secret-commit.sh` : refuse un commit qui contient `.env*` ou une clé.
-  - `enforce-file-size.sh` : fichier de code > 500 lignes = proposer un découpage (avec accord).
+  - `enforce-file-size.sh` : fichier de code > 500 lignes = découpé automatiquement, sans demander.
 - Un hook qui bloque applique la règle : ne pas le contourner.
