@@ -52,8 +52,15 @@ export class Cancelled extends Error {
  * deux objectifs et l'historique est conservé.
  */
 export class Session {
-  constructor({ tab, maxSteps = 40 } = {}) {
+  /**
+   * extraTools : outils en plus des outils de base, [{ schema, run(params, ctx) }] (ex. lire_mail pour Qezaly).
+   * secrets : { nom: valeur } ; le modèle n'écrit que {{nom}}, remplacé au moment d'exécuter l'outil
+   * et masqué dans ce qu'il lit en retour. Le modèle ne voit donc jamais la valeur.
+   */
+  constructor({ tab, maxSteps = 40, extraTools = [], secrets = null } = {}) {
     this.tab = tab;
+    this.extraTools = extraTools;
+    this.secrets = secrets;
     this.model = null; // { provider, model } choisi pour cette session, sinon la chaîne par défaut
     this.shotEveryStep = false; // true : capture de la page envoyée au modèle à chaque étape
     this.saveEveryStep = false; // true (avec shotEveryStep) : ces captures sont aussi rangées dans le panneau Captures
@@ -80,6 +87,28 @@ export class Session {
 
   #check() { if (this.cancelled) throw new Cancelled(); }
 
+  #tools() { return this.extraTools.length ? [...TOOL_SCHEMAS, ...this.extraTools.map((x) => x.schema)] : TOOL_SCHEMAS; }
+
+  /** Remplace les repères {{nom}} par les valeurs secrètes, dans chaque texte des paramètres. */
+  #reveal(params) {
+    if (!this.secrets) return params;
+    const out = {};
+    for (const [k, v] of Object.entries(params)) {
+      out[k] = typeof v === 'string'
+        ? v.replace(/\{\{\s*([\w.]+)\s*\}\}/g, (m, n) => (n in this.secrets ? String(this.secrets[n]) : m))
+        : v;
+    }
+    return out;
+  }
+
+  /** Remet les repères à la place des valeurs secrètes dans ce que le modèle va lire. */
+  #mask(text) {
+    if (!this.secrets) return text;
+    let s = String(text);
+    for (const [n, v] of Object.entries(this.secrets)) if (v && String(v).length >= 3) s = s.split(String(v)).join(`{{${n}}}`);
+    return s;
+  }
+
   async run(objective, { onEvent = () => {}, maxSteps = this.maxSteps } = {}) {
     if (this.busy) throw new Error('Une tâche est déjà en cours sur cette session.');
     this.busy = true;
@@ -100,12 +129,12 @@ export class Session {
       this.messages.push({ role: 'user', content: `OBJECTIF:\n${objective}` });
       this.messages.push({
         role: 'user',
-        content: `ÉTAT DU NAVIGATEUR:\n${renderSnapshot(await this.tab.snapshot())}`
+        content: this.#mask(`ÉTAT DU NAVIGATEUR:\n${renderSnapshot(await this.tab.snapshot())}`)
       });
 
       for (let step = 1; step <= maxSteps; step++) {
         this.#check();
-        const msg = await chat({ messages: this.messages, tools: TOOL_SCHEMAS, signal: this.ac.signal, prefer: this.model });
+        const msg = await chat({ messages: this.messages, tools: this.#tools(), signal: this.ac.signal, prefer: this.model });
         this.#check();
         this.messages.push(msg);
         if (msg.usedModel) {
@@ -129,7 +158,7 @@ export class Session {
         if (!calls.length) {
           this.messages.push({
             role: 'user',
-            content: `Aucun outil appelé. Appelle un outil, ou done si c'est terminé.\n\nÉTAT DU NAVIGATEUR:\n${renderSnapshot(await this.tab.snapshot())}`
+            content: this.#mask(`Aucun outil appelé. Appelle un outil, ou done si c'est terminé.\n\nÉTAT DU NAVIGATEUR:\n${renderSnapshot(await this.tab.snapshot())}`)
           });
           continue;
         }
@@ -155,11 +184,14 @@ export class Session {
 
           let output, artifact;
           try {
-            const r = await runTool(this.tab, name, params);
+            const extra = this.extraTools.find((x) => x.schema.function.name === name);
+            const real = this.#reveal(params);
+            const r = extra ? await extra.run(real, { onEvent, signal: this.ac.signal, step }) : await runTool(this.tab, name, real);
             // Certains outils produisent un livrable (capture d'écran…) en plus de leur sortie texte.
             if (r && typeof r === 'object') { output = r.output; artifact = r.artifact; } else output = r;
             if (r?.seen) wantShot = true;
           } catch (e) { output = `ERREUR: ${String(e.message).slice(0, 600)}`; }
+          output = this.#mask(output);
           if (String(output).startsWith('ERREUR')) failed = name;
 
           if (artifact) onEvent({ type: 'artifact', step, ...artifact });
@@ -170,7 +202,7 @@ export class Session {
         this.#check();
         const snap = await this.tab.snapshot();
         measure(step);
-        const state = `ÉTAT DU NAVIGATEUR:\n${renderSnapshot(snap)}`;
+        const state = this.#mask(`ÉTAT DU NAVIGATEUR:\n${renderSnapshot(snap)}`);
         // Lecture de la page impossible (page figée, en plein chargement) : la capture montre où elle en est.
         if (snap.error && !failed) failed = 'lecture de la page';
         // Capture de la page : après un échec, sur demande (outil screenshot) ou à chaque étape si l'option est active.
