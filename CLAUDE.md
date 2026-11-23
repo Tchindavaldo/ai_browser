@@ -38,10 +38,51 @@ Ex `rauvalia-web`, déplacé ici. Dépôt GitHub : `Tchindavaldo/ai_browser`.
 - Le modèle qui a réellement répondu s'affiche à chaque étape (« bascule vers ... » s'il diffère
   du modèle prévu) et dans le tableau de bord.
 
-## Qezaly
+## Projet Qezaly
 
+- Qezaly : payer des abonnements (Netflix, Spotify...) par Mobile Money, via un agent IA.
+- Ce dépôt = **l'agent IA** qui gère le back office (activation des abonnements).
+- Dépôts liés : `Netflix-Automation` (back-end, endpoints ; il transmet les codes et OTP
+  captés dans Zoho Mail), `moobilPay-frontend-reactNative-expo` (app mobile),
+  `mobilwallet-backend` (paiement Mobile Money).
 - `src/qezaly/` : file des tâches envoyées par le back-end Qezaly (abonnements Netflix et Spotify),
   routes `/api/qezaly/*`, contrat dans `QEZALY.md`. Jeton `QEZALY_AGENT_TOKEN`.
 - Le modèle IA ne voit jamais carte ni mot de passe : repères `{{nom}}` remplacés à la saisie
   (`Session.secrets` dans `src/agent.js`) et masqués dans ce qu'il relit.
 - Tâches en parallèle : `agent_settings.max_parallel` dans le Supabase de l'agent (10 par défaut).
+
+## Style de réponse
+
+- **Court et droit au but.** Listes à puces, pas de paragraphes.
+- Répondre à ce qui est demandé, rien de plus. Pas de post-scriptum.
+- Jamais de `.md` récapitulatif sans demande.
+
+## L'IA décide, le code informe
+
+- Le code fournit à l'IA ce qu'elle voit (page, URL, captures) et les outils pour agir.
+- Le code ne décide jamais à sa place qu'une étape a réussi ou échoué.
+
+## Architecture
+
+- Un fichier = une responsabilité. Viser ~400 lignes, **500 = plafond** : au-delà, découper automatiquement, sans demander.
+- `public/index.html` dépasse déjà ce plafond : le découper dès qu'on y touche.
+- Pas d'agent Explore pour « découvrir » le projet : lire ce fichier et `README.md`.
+
+## Branches Git
+
+- Jamais de travail direct sur `main`.
+- `feature/<sujet>` : fonctionnalité ; `debug/<sujet>` : un bug.
+- Fusion seulement après validation de l'utilisateur.
+
+## Plusieurs options : demander
+
+- Quand une action a plusieurs options (déployer ou non, quelle branche...), demander d'abord.
+  Ne jamais inventer un paramètre non donné.
+
+## Hooks
+
+- `.claude/hooks/` (déclarés dans `.claude/settings.json`), repris du modèle yaammoo :
+  - `session-start-read.sh` : injecte ce fichier au premier message de la session.
+  - `no-secret-commit.sh` : refuse un commit qui contient `.env*` ou une clé.
+  - `enforce-file-size.sh` : fichier de code > 500 lignes = découpé automatiquement, sans demander.
+- Un hook qui bloque applique la règle : ne pas le contourner.
