@@ -37,3 +37,39 @@ Ex `rauvalia-web`, déplacé ici. Dépôt GitHub : `Tchindavaldo/ai_browser`.
   l'historique ; `src/llm.js` la retire pour les modèles texte seul.
 - Le modèle qui a réellement répondu s'affiche à chaque étape (« bascule vers ... » s'il diffère
   du modèle prévu) et dans le tableau de bord.
+
+## Projet Qezaly
+
+- Qezaly : payer des abonnements (Netflix, Spotify...) par Mobile Money, via un agent IA.
+- Ce dépôt = **l'agent IA** qui gère le back office (activation des abonnements).
+- Dépôts liés : `Netflix-Automation` (back-end, endpoints ; il transmet les codes et OTP
+  captés dans Zoho Mail), `moobilPay-frontend-reactNative-expo` (app mobile),
+  `mobilwallet-backend` (paiement Mobile Money).
+
+## Style de réponse
+
+- **Court et droit au but.** Listes à puces, pas de paragraphes.
+- Répondre à ce qui est demandé, rien de plus. Pas de post-scriptum.
+- Jamais de `.md` récapitulatif sans demande.
+
+## L'IA décide, le code informe
+
+- Le code fournit à l'IA ce qu'elle voit (page, URL, captures) et les outils pour agir.
+- Le code ne décide jamais à sa place qu'une étape a réussi ou échoué.
+
+## Architecture
+
+- Un fichier = une responsabilité. Viser ~400 lignes, **500 = plafond** pour tout nouveau fichier.
+- `public/index.html` dépasse déjà ce plafond : le découper seulement avec accord.
+- Pas d'agent Explore pour « découvrir » le projet : lire ce fichier et `README.md`.
+
+## Branches Git
+
+- Jamais de travail direct sur `main`.
+- `feature/<sujet>` : fonctionnalité ; `debug/<sujet>` : un bug.
+- Fusion seulement après validation de l'utilisateur.
+
+## Plusieurs options : demander
+
+- Quand une action a plusieurs options (déployer ou non, quelle branche...), demander d'abord.
+  Ne jamais inventer un paramètre non donné.
