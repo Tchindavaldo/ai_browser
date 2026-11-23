@@ -73,3 +73,11 @@ Ex `rauvalia-web`, déplacé ici. Dépôt GitHub : `Tchindavaldo/ai_browser`.
 
 - Quand une action a plusieurs options (déployer ou non, quelle branche...), demander d'abord.
   Ne jamais inventer un paramètre non donné.
+
+## Hooks
+
+- `.claude/hooks/` (déclarés dans `.claude/settings.json`), repris du modèle yaammoo :
+  - `session-start-read.sh` : injecte ce fichier au premier message de la session.
+  - `no-secret-commit.sh` : refuse un commit qui contient `.env*` ou une clé.
+  - `enforce-file-size.sh` : fichier de code > 500 lignes = proposer un découpage (avec accord).
+- Un hook qui bloque applique la règle : ne pas le contourner.
