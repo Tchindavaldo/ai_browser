@@ -1,15 +1,14 @@
 /**
  * File des tâches Qezaly : reçues du back-end, exécutées par l'agent, au plus N à la fois.
  *
- * - N = agent_settings.max_parallel dans le Supabase de l'agent, relu chaque minute
- *   (sinon QEZALY_MAX_PARALLEL, sinon 10).
+ * - N = maxParallel donné par le back-end (GET /api/agent/settings), relu chaque minute
+ *   (sinon QEZALY_MAX_PARALLEL, sinon 10). L'agent n'accède à aucune base.
  * - Chaque tâche a son propre navigateur (profil neuf, cloisonné) : une session normale,
  *   visible dans le tableau de bord, où l'admin peut reprendre la main.
- * - Chaque changement d'état est renvoyé au back-end (callback) et noté dans agent_runs.
+ * - Chaque changement d'état est renvoyé au back-end (callback), avec étapes, jetons et coût.
  */
 import { objectiveOf, secretsOf } from './prompts.js';
-import { callback, fetchMails, normalizeMail } from './backend.js';
-import { getSetting, saveRun, unfinishedRuns } from './supabase.js';
+import { callback, fetchMails, fetchSettings, fetchUnfinished, normalizeMail } from './backend.js';
 
 const DEFAULT_LIMIT = Number(process.env.QEZALY_MAX_PARALLEL || 10);
 const MAX_STEPS = Number(process.env.QEZALY_MAX_STEPS || 80);
@@ -37,15 +36,16 @@ export class TaskQueue {
     setInterval(() => this.refreshLimit().then(() => this.#pump()), 60 * 1000).unref();
     // Garde la machine Fly allumée tant qu'il y a du travail (voir #keepAlive).
     setInterval(() => this.#keepAlive(), 60 * 1000).unref();
-    await this.#recover();
+    // Attente : une tâche envoyée juste au réveil de la machine doit arriver avant la reprise.
+    setTimeout(() => this.#recover(), 15 * 1000).unref();
     return this;
   }
 
   async refreshLimit() {
     try {
-      const v = Number(await getSetting('max_parallel'));
-      if (Number.isInteger(v) && v > 0) { this.limit = v; this.limitSource = 'Supabase'; return; }
-    } catch (e) { console.log(`  Qezaly : réglage max_parallel illisible (${e.message}), on garde ${this.limit}`); return; }
+      const v = Number((await fetchSettings())?.maxParallel);
+      if (Number.isInteger(v) && v > 0) { this.limit = v; this.limitSource = 'back-end'; return; }
+    } catch (e) { console.log(`  Qezaly : réglage maxParallel illisible (${e.message}), on garde ${this.limit}`); return; }
     this.limit = DEFAULT_LIMIT; this.limitSource = 'défaut';
   }
 
@@ -159,7 +159,7 @@ export class TaskQueue {
     this.#pump();
   }
 
-  /** Callback au back-end + ligne agent_runs. Jamais bloquant. */
+  /** Callback au back-end (état, étapes, jetons, coût). Jamais bloquant. */
   #report(rec) {
     const v = this.view(rec);
     const u = rec.usage ?? {};
@@ -167,12 +167,6 @@ export class TaskQueue {
       ...v, at: new Date().toISOString(),
       // Noms attendus aussi par le back-end (premier brouillon).
       session_id: v.sessionId, task_ref: v.taskId, cost_usd: u.usd ?? null, tokens_in: u.input ?? null, tokens_out: u.output ?? null
-    });
-    saveRun({
-      task_id: v.taskId, order_id: v.orderId, service: v.service, status: v.status, success: v.success,
-      result: v.result?.slice(0, 4000) ?? null, needs_admin: v.needsAdmin, session_id: v.sessionId, steps: v.steps,
-      tokens_in: u.input ?? null, tokens_out: u.output ?? null, cost_usd: u.usd ?? null, cost_cfa: u.cfa ?? null,
-      bytes: u.bytes ?? null, queued_at: v.queuedAt, started_at: v.startedAt, finished_at: v.finishedAt
     });
   }
 
@@ -246,17 +240,20 @@ export class TaskQueue {
   /** Tâches coupées par un redémarrage : signalées en échec pour que l'admin les reprenne. */
   async #recover() {
     let rows = [];
-    try { rows = await unfinishedRuns(); } catch (e) { console.log(`  Qezaly : reprise impossible (${e.message})`); return; }
-    for (const r of rows ?? []) {
+    try { rows = await fetchUnfinished(); } catch (e) { console.log(`  Qezaly : reprise impossible (${e.message})`); return; }
+    // Seules les tâches déjà lancées ont été coupées ; une tâche « queued » peut être en route.
+    rows = (rows ?? []).filter((r) => ['running', 'waiting_mail'].includes(r.status));
+    for (const r of rows) {
       const rec = {
-        task: { taskId: r.task_id, orderId: r.order_id, service: r.service }, status: 'failed', success: false,
-        result: 'Tâche interrompue par un redémarrage de l’agent.', needsAdmin: true, sessionId: r.session_id,
+        task: { taskId: r.taskId, orderId: r.orderId, service: r.service }, status: 'failed', success: false,
+        result: 'Tâche interrompue par un redémarrage de l’agent.', needsAdmin: true, sessionId: r.sessionId ?? null,
         steps: 0, usage: null, captures: [], inbox: [], seenMails: new Set(),
         queuedAt: null, startedAt: null, finishedAt: new Date().toISOString()
       };
-      this.tasks.set(r.task_id, rec);
+      if (!r.taskId || this.tasks.has(r.taskId)) continue;
+      this.tasks.set(r.taskId, rec);
       this.#report(rec);
     }
-    if (rows?.length) console.log(`  Qezaly : ${rows.length} tâche(s) interrompue(s) signalée(s) au back-end.`);
+    if (rows.length) console.log(`  Qezaly : ${rows.length} tâche(s) interrompue(s) signalée(s) au back-end.`);
   }
 }
