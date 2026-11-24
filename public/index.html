@@ -1048,13 +1048,13 @@ setInterval(async () => {
   } catch {}
 }, 1200);
 setInterval(() => { if (view === 'dash') refreshThumbs(); }, 3000);
-// Tâches envoyées par le back-end Qezaly : en cours, en attente, limite réglée dans Supabase.
+// Tâches envoyées par le back-end Qezaly : en cours, en attente, limite réglée par le back-end.
 async function refreshQz() {
   try {
     const q = await (await fetch('/api/qezaly/tasks')).json();
     const failed = q.tasks.filter((t) => t.needsAdmin).length;
     $('tQz').textContent = `${q.running}/${q.limit}`;
-    $('hQz').textContent = `${q.queued} en attente${failed ? ` · ${failed} en échec, à reprendre` : ''} · limite ${q.limitSource === 'Supabase' ? 'Supabase' : 'par défaut'}`;
+    $('hQz').textContent = `${q.queued} en attente${failed ? ` · ${failed} en échec, à reprendre` : ''} · limite ${q.limitSource === 'back-end' ? 'back-end' : 'par défaut'}`;
   } catch {}
 }
 refreshQz();

@@ -2,6 +2,8 @@
  * Appels de l'agent vers le back-end Qezaly (contrat : qezaly-agent/CONTRAT.md).
  * - callback : fin ou changement d'état d'une tâche.
  * - mails : mails Zoho rattachés à une tâche (codes, liens).
+ * - réglages (tâches en parallèle) et tâches restées en cours après un redémarrage.
+ * L'agent n'accède à aucune base : tout passe par le back-end.
  * Un seul jeton partagé, QEZALY_AGENT_TOKEN, en Bearer dans les deux sens.
  */
 const BASE = () => (process.env.QEZALY_BACKEND_URL || '').replace(/\/$/, '');
@@ -54,4 +56,22 @@ export function normalizeMail(m) {
     codes: Array.isArray(m.codes) && m.codes.length ? m.codes.map(String) : [...new Set(text.match(/\b\d{4,8}\b/g) ?? [])],
     receivedAt: m.receivedAt ?? m.received_at ?? new Date().toISOString()
   };
+}
+
+async function getJson(path) {
+  const res = await fetch(`${BASE()}${path}`, { headers: headers(), signal: AbortSignal.timeout(15000) });
+  if (!res.ok) throw new Error(`back-end : HTTP ${res.status}`);
+  return res.json();
+}
+
+/** Réglages de l'agent gardés par le back-end : { maxParallel }. null si le back-end n'est pas réglé. */
+export async function fetchSettings() {
+  if (!BASE()) return null;
+  return getJson('/api/agent/settings');
+}
+
+/** Tâches que le back-end croit encore en cours (queued, running, waiting_mail). */
+export async function fetchUnfinished() {
+  if (!BASE()) return [];
+  return (await getJson('/api/agent/tasks/unfinished')).tasks ?? [];
 }

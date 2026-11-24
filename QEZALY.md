@@ -1,7 +1,8 @@
 # Qezaly : tâches d'abonnement envoyées par le back-end
 
-Code : `src/qezaly/` (file, objectifs Netflix et Spotify, appels au back-end, Supabase de l'agent).
-Réglages : `.env.example`, section Qezaly. Tables : `supabase/schema.sql`.
+Code : `src/qezaly/` (file, objectifs Netflix et Spotify, appels au back-end).
+L'agent n'accède à aucune base : réglages, coûts et reprise passent par le back-end.
+Réglages : `.env.example`, section Qezaly.
 Dans l'interface : tuile « Tâches Qezaly » du tableau de bord ; chaque tâche est une session
 normale (titre « Qezaly netflix ... »), où l'admin peut reprendre la main après un échec.
 
@@ -71,6 +72,14 @@ et laisse la commande « en cours » côté client. La session reste ouverte dan
 Après un redémarrage de l'agent, les tâches qui tournaient sont renvoyées en `failed`
 avec `needsAdmin: true` et le motif « interrompue par un redémarrage ».
 
+### `GET {QEZALY_BACKEND_URL}/api/agent/settings`
+`{ "maxParallel": 10 }`. Relu chaque minute ; 10 si l'appel échoue.
+
+### `GET {QEZALY_BACKEND_URL}/api/agent/tasks/unfinished`
+`{ "tasks": [{ "taskId", "orderId", "service", "sessionId", "status" }] }` : tâches en queued,
+running ou waiting_mail. Appelé 15 s après le démarrage de l'agent, qui renvoie un callback
+`failed` pour chaque tâche en running ou waiting_mail qu'il ne connaît pas.
+
 ### `GET {QEZALY_BACKEND_URL}/api/agent/tasks/:taskId/mails?since=ISO`
 Même format que ci-dessus : `{ "mails": [...] }`. L'agent l'appelle quand il attend un code
 et qu'aucun mail poussé n'est arrivé.
@@ -78,5 +87,5 @@ et qu'aucun mail poussé n'est arrivé.
 ## Ce que l'agent garantit
 - Mots de passe et carte jamais envoyés au modèle IA : il ne voit que des repères
   (`{{carte_numero}}`...), remplacés au moment de la saisie et masqués dans les sorties.
-- Coûts et jetons par tâche dans le Supabase de l'agent (`agent_runs`).
-- Tâches en parallèle : `agent_settings.max_parallel` (10 par défaut), relu chaque minute.
+- Coûts et jetons par tâche dans chaque callback (`usage`, `steps`) : le back-end les enregistre.
+- Tâches en parallèle : `maxParallel` de `GET /api/agent/settings` (10 par défaut), relu chaque minute.

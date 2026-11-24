@@ -49,7 +49,8 @@ Ex `rauvalia-web`, déplacé ici. Dépôt GitHub : `Tchindavaldo/ai_browser`.
   routes `/api/qezaly/*`, contrat dans `QEZALY.md`. Jeton `QEZALY_AGENT_TOKEN`.
 - Le modèle IA ne voit jamais carte ni mot de passe : repères `{{nom}}` remplacés à la saisie
   (`Session.secrets` dans `src/agent.js`) et masqués dans ce qu'il relit.
-- Tâches en parallèle : `agent_settings.max_parallel` dans le Supabase de l'agent (10 par défaut).
+- Tâches en parallèle : `maxParallel` donné par le back-end (`GET /api/agent/settings`, 10 par défaut).
+- **ai_browser n'accède jamais directement à une base Supabase** : tout passe par le back-end Qezaly.
 
 ## Style de réponse
 
